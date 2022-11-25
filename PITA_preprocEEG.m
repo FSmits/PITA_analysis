@@ -1,26 +1,6 @@
 %% EEG pre-processing - PITA - all data
 
-clear
-close all
-
-%% open EEGlab
-
-cd('/Users/fsmits2/Downloads/eeglab2021.0')
-[ALLEEG, EEG, CURRENTSET, ALLCOM] = eeglab;
-
-% return to PITA analysis folder
-cd('/Users/fsmits2/Documents/PITA_analysis');
-
-
-%% set paths to data
-
-Path2EEGbdf  = '/Users/fsmits2/Downloads/1 EEG data tacs-eeg/';
-Path2EEGsets = '/Users/fsmits2/Downloads/1 EEG data tacs-eeg/3 EEG sets processed';
-
-
-%% enter subject identification numbers
-
-% NOTE!
+%% NOTE!
 % Stimulatie NIET uitgevoerd bij (subjectID-sessie):
 % 297-2 - REAL tACS - LE, AQM   - Notes: Matlab gaf foutmelding, fenne is gekomen om te helpen, zijn ongeveer een uur later begonnen dan gepland
 % 334-1 - REAL tACS - MvK, RK   - none
@@ -43,14 +23,41 @@ Path2EEGsets = '/Users/fsmits2/Downloads/1 EEG data tacs-eeg/3 EEG sets processe
 %       752 227	565	626 334	362	600	121	319 923	915	298	202	692	275	...
 %       508 291	803	755	681	876	134	559	396	818	601	297	524	883	193	642];
 
+%% Start by clearing workspace
+
+clear
+close all
+
+%% Initialize
+
+% open EEGlab
+cd('/Users/fsmits2/Downloads/eeglab2021.0')
+[ALLEEG, EEG, CURRENTSET, ALLCOM] = eeglab;
+
+cd('/Users/fsmits2/Documents/PITA_analysis'); % return to PITA analysis folder
+
+% set paths to data
+Path2EEGbdf  = '/Users/fsmits2/Downloads/1 EEG data tacs-eeg/';
+Path2EEGsets = '/Users/fsmits2/Downloads/1 EEG data tacs-eeg/3 EEG sets processed';
+
+% enter subject names
 subj_list =[669	557 363	638	989	383	502	733	442	575	710	262 ...
     752 227	565	362	600	121	319 923	915	298	202	692	275	...
     508 291	803	755	681	876	134	559	818	601	524	883	193	642];
+sessions  = [1 2];
 
-sessions  =  [1 2];
+% enter filenames
+recording1 = 'restingstate-pretACS-';
+recording2 = 'Encoding-';
+recording3 = 'TACSEEG-';
+recording4 = 'restingstate-posttACS-';
+recording5 = 'Retrieval-';
+file_type = {recording1, recording2, recording3, recording4, recording5};
 
-%% Original trigger codes
 
+%% read EEG file
+
+% Original trigger codes
 StartRec        = 254;
 StopRec         = 255;
 start_tACS      = 5; %(2:20) identical to stop_EEG minus(1:19)
@@ -59,58 +66,34 @@ start_EEG       = 7;
 stop_EEG        = 8;
 post_tACS_EEG   = 9;
 
-
-%% enter filenames
-
-recording1 = 'restingstate-pretACS-';
-recording2 = 'Encoding-';
-recording3 = 'TACSEEG-';
-recording4 = 'restingstate-posttACS-';
-recording5 = 'Retrieval-';
-
-file_type = {recording1, recording2, recording3, recording4, recording5};
-
-
-
-%% read EEG file
-
-
-% initiate time/period-related triggers
+% Initiate time/period-related triggers
 secs      = 30; % 30 seconden data na elke tACS stimulatie
 stims     = 20; % 20 tACS stimulaties in totaal
 trig_base = repmat(0.01:0.01:0.30,[stims,1]);
 stim_mat  = repmat(1:stims,[secs,1])';
-% Trigger names are: #stimulation as integer, #second of data following that stimulation as decimal
-trigs     = trig_base + stim_mat;
+trigs     = trig_base + stim_mat; % Trigger names are: #stimulation as integer, #second of data following that stimulation as decimal
 
-
+% Loop over files
 for subj_i = 1:length(subj_list)
-
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nStart processing subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
 
         fileName = fullfile(Path2EEGbdf, [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '.bdf']);
 
-        % Load raw bdf data file via EEGlab
+        % -- Load raw bdf data file via EEGlab
         EEG = pop_biosig( fileName );
 
-
-        % Enter data to the EEG structure
+        % -- Enter data to the EEG structure
         EEG.filename = fileName;
         EEG.setname  = fileName;
         EEG.subject  = subj_list(subj_i);
         EEG.session  = sess_i;
 
-
-        % Remove non-recorded channels
-        % F3 F4 (tACS electrode locations) and EXG7 EXG8
+        % -- Remove non-recorded channels: F3 F4 (tACS electrode locations) and EXG7 EXG8
         EEG = pop_select(EEG, 'nochannel', {'F3', 'F4', 'EXG7', 'EXG8'});
 
-
-        % Re-code events
-        % [Why? BioSemi/Computer settings resulted in changes in the recorded trigger codes relative to the originally programmed triggers codes. These changes are unfortunately not exactly the same across subjects.]
-
+        % -- Re-code events [Why? BioSemi/Computer settings resulted in changes in the recorded trigger codes relative to the originally programmed triggers codes. These changes are unfortunately not exactly the same across subjects.]
         % remove added trigger text like 'condition' and 'artifact'
         for ev_i = 1:length({EEG.event.type})
             EEG.event(ev_i).type = strrep( EEG.event(ev_i).type, 'condition ', '' );
@@ -121,8 +104,7 @@ for subj_i = 1:length(subj_list)
         trig_256 = find(strcmpi( {EEG.event.type}, '256' ));
         EEG = pop_editeventvals(EEG,'delete', trig_256);
 
-        % find or create trigger for tACS onset
-        % (original code = '5'. Other possibile codes = '8' , ':Failing electrode' , ':breathing'.)
+        % find or create trigger for tACS onset   (original code = '5'. Other possibile codes = '8' , ':Failing electrode' , ':breathing'.)
         if any( subj_list(subj_i) == [638 275 262] )  &&  sess_i==1
             EEG = pop_editeventvals(EEG,'insert',{1,[],[],[],[]},'changefield',{1,'type','5'},'changefield',{1,'edftype','5'},'changefield',{1,'latency',0.01});
         end
@@ -172,8 +154,7 @@ for subj_i = 1:length(subj_list)
             tACS_begin  = tACS_begin(1:20);
         end
 
-        % find trigger for tACS offset
-        % (original code = '6'. Other possibile codes = '7' , ':sweat' , ':50/60 Hz mains interference'.)
+        % find trigger for tACS offset   (original code = '6'. Other possibile codes = '7' , ':sweat' , ':50/60 Hz mains interference'.)
         tACS_end = sort([find(strcmpi( {EEG.event.type}, '6' )), ...
             find(strcmpi( {EEG.event.type}, '7' )), ...
             find(strcmpi( {EEG.event.type}, ':50/60 Hz mains interference' )), ...
@@ -188,21 +169,20 @@ for subj_i = 1:length(subj_list)
             EEG = pop_editeventvals(EEG,'changefield', {tACS_end(trig_i)   'type' 'tACS_stop'});
         end
 
-        % Insert time-related indices as event codes
+        % insert time-related indices as event codes
         bndrs     = find(strcmpi( {EEG.event.type}, 'tACS_stop' ));
-        bndrs_lat = [EEG.event(bndrs).latency];       
-        % Insert indexing trigger code every full second + little delay of 5 ms so that the indexing triggers do not overlap with 1-second epoch cuts
+        bndrs_lat = [EEG.event(bndrs).latency];
+        % insert indexing trigger code every full second + little delay of 5 ms so that the indexing triggers do not overlap with 1-second epoch cuts
         for i_EEGs = 1:length(bndrs)
             for i_secs = 1:secs
                 EEG = pop_editeventvals(EEG, 'insert',{bndrs(i_EEGs)+i_secs,[],[],[],[]},...
-                    'changefield',{bndrs(i_EEGs)+i_secs ,'type',    trigs(i_EEGs,i_secs) },...                    
+                    'changefield',{bndrs(i_EEGs)+i_secs ,'type',    trigs(i_EEGs,i_secs) },...
                     'changefield',{bndrs(i_EEGs)+i_secs ,'edftype', trigs(i_EEGs,i_secs) },...
                     'changefield',{bndrs(i_EEGs)+i_secs ,'latency', bndrs_lat(i_EEGs)/EEG.srate + i_secs}); % for latency event, latencies are in millisecond compared to the time locking event, not in data samples.
             end
         end
 
-
-        % Cut out data during stimulation (tACS)
+        % -- Cut out data during stimulation (tACS)
         tACS_begin = sort(find(strcmpi( {EEG.event.type}, 'tACS_start' )));
         tACS_end   = sort(find(strcmpi( {EEG.event.type}, 'tACS_stop' )));
         for ni = flip(1:length(tACS_begin))
@@ -210,33 +190,24 @@ for subj_i = 1:length(subj_list)
             [ALLEEG, EEG, CURRENTSET] = eeg_store(ALLEEG, EEG); % store changes
         end
 
-
-        % Cut out data before first tACS-EEG & after last tACS-EEG period
+        % -- Cut out data before first tACS-EEG & after last tACS-EEG period
         EEG_begin = find(strcmpi( {EEG.event.type}, 'boundary' ));
         EEG_end   = sort([find(strcmpi( {EEG.event.type}, '8' )), find(strcmpi( {EEG.event.type}, ':breathing' ))]);
         EEG_end   = EEG_end(1,end); % in case multiple trigger codes '8' are available, pick last one
-
         EEG       = eeg_eegrej(EEG, [EEG.event(EEG_end).latency + 0.05,   EEG.pnts(end)]);
         EEG       = eeg_eegrej(EEG, [0,   EEG.event(EEG_begin(1)).latency - 0.05]);
 
+        %         pop_eegplot( EEG, 1, 1, 1); % Inspect data
 
-        %         % Inspect data
-        %         pop_eegplot( EEG, 1, 1, 1);
-
-
-        % Save
-        fprintf('\n****\nSave processed subject %i session %i\n****\n\n', ...
-            subj_list(subj_i), sessions(sess_i));
+        % -- Save
+        fprintf('\n****\nSave processed subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
         SaveName = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_RawEEG.set'];
         EEG = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
 
         clear EEG
         ALLEEG(1:end) = [];
-
     end
-
 end
-
 
 %% Verify stimulator was on during tACS procedure in each individual dataset
 
@@ -245,11 +216,7 @@ full_subj_list =   [669	557 363	638	602	989	383	502	733	442	575	913 710	262 ...
     752 227	565	626 334	362	600	121	319 923	915	298	202	692	275	...
     508 291	803	755	681	876	134	559	396	818	601	297	524	883	193	642];
 
-sessions  =  [1 2];
-
-
 for subj_i = 1:length(full_subj_list)
-
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nStart processing subject %i session %i\n****\n\n', full_subj_list(subj_i), sessions(sess_i));
@@ -258,7 +225,6 @@ for subj_i = 1:length(full_subj_list)
 
         % Load EEG set
         EEG      = pop_loadset('filename', [fileName, '_RawEEG.set'], 'filepath', Path2EEGsets);
-
 
         % Plot data and check if tACS artifact is visible. If not - check if stimulation was carried out correctly.
         pop_eegplot( EEG, 1, 1, 1);
@@ -279,13 +245,9 @@ for subj_i = 1:length(full_subj_list)
     end
 end
 
-
-
-
 %% Pre-processing steps: insert time triggers, re-reference, downsample, filter, create bipolar EOG channels
 
 for subj_i = 1:length(subj_list)
-
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nStart pre-processing subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
@@ -294,7 +256,6 @@ for subj_i = 1:length(subj_list)
 
         % Load EEG set
         EEG      = pop_loadset('filename', [fileName, '_RawEEG.set'], 'filepath', Path2EEGsets);
-
 
         % Re-reference to avg mastoids
         mastoid1 = find(strcmpi( {EEG.chanlocs.labels}, 'EXG5' ));
@@ -315,10 +276,7 @@ for subj_i = 1:length(subj_list)
         EEG.chanlocs( EOG_ch(1) ).labels = 'VEOG'; % EXG1 is now the bipolar VEOG channel. Change channel name.
         EEG.chanlocs( EOG_ch(2) ).labels = 'HEOG'; % EXG3 is now the bipolar HEOG channel. Change channel name.
 
-
-        %         % Inspect data
-        %         pop_eegplot( EEG, 1, 1, 1);
-
+        %         pop_eegplot( EEG, 1, 1, 1); % Inspect data
 
         % Save
         fprintf('\n****\nSave pre-processed subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
@@ -327,40 +285,120 @@ for subj_i = 1:length(subj_list)
 
         clear EEG
         ALLEEG(1:end) = [];
-
     end
 end
 
 
 
-%% Clean data
-
+%% Clean the data
 
 % initiate time/period-related triggers
 secs      = 30; % 30 seconden data na elke tACS stimulatie
 stims     = 20; % 20 tACS stimulaties in totaal
 trig_base = repmat(0.01:0.01:0.30,[stims,1]);
 stim_mat  = repmat(1:stims,[secs,1])';
-% Trigger names are: #stimulation as integer, #second of data following that stimulation as decimal
-trigs     = trig_base + stim_mat;
+trigs     = trig_base + stim_mat; % Trigger names are: #stimulation as integer, #second of data following that stimulation as decimal
 trigs     = reshape(trigs', [1,numel(trigs)]);
 trigs     = num2cell(trigs);
 
+% initialize matrix to save no. of rejected epochs per subject:
+rej_epocs = [subj_list'  nan(length(subj_list),length(sessions)*2)];
 
+% Loop over files
 for subj_i = 1:length(subj_list)
-
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-
         fileName = ['TACSEEG-' num2str(subj_list(subj_i)) '-' num2str(sess_i)];
 
         % Load EEG set
         EEG      = pop_loadset('filename', [fileName, '_PreprocEEG.set'], 'filepath', Path2EEGsets);
 
-        % Divide into 1-sec epochs
-        EEG = pop_epoch( EEG, trigs,  [0  1], 'epochinfo', 'yes'); %WERKTNIET
+        % Interpolate bad channels
+        pop_eegplot(EEG,1,1,1)
+        m0 = 0;
+        while m0 == 0
+            m0 = str2double( input('How many bad channels (interpolation needed?) ','s') );
+        end
+        m0s = num2cell(nan(1,m0));
+        if m0 > 0
+            for badchani = 1:m0
+                badchan =  input(['Which channel to interpolate? nr ' num2str(badchani) ' ' ],'s');
+                chan2interp = find( strcmpi( badchan, {EEG.chanlocs.labels} ));
+                % Enter channel locations
+                EEG = pop_chanedit(EEG, 'lookup','/Users/fsmits2/Downloads/eeglab2021.0/plugins/dipfit/standard_BESA/standard-10-5-cap385.elp');
+                EEG = pop_interp(EEG, chan2interp, 'spherical');
+            end
+        end
 
+        % Divide into 1-sec epochs
+        EEG = pop_epoch( EEG, trigs,  [0  1], 'epochinfo', 'yes');
+
+        % Semi-automatic artifact rejection
+        %     Gradient:  Specifies that the absolute difference between two adjacent sample points of data must not exceed a value (artifact of weird spikes). Starting values from Boost tutorial: Gradient: 75 μV
+        %     Amplitude: Specifies that the voltage must not  exceed a certain value (artifacts like eye blinks). Starting values from Boost tutorial: Max-Min: 150 μV/200 ms
+        %     Diff max-Min: Sets the threshold for the difference between the minimum and maximum voltages within the entire segment (voltage drifts). Starting values from Boost tutorial: Amplitude: -100 μV, +100 μV"
+        ALLEEG  = EEG; CURRENTSET = 1; % Define ALLEEG and CURRENSET to enable trial rejection via pop_eegplot()
+        winpnts = round(200/(1000/EEG.srate)); % points for window of 200 ms segments in the epoch
+        winidx  = 1:winpnts:EEG.pnts; 
+        windiff = nan(1,length(winidx));
+        EEG.reject.rejmanual = zeros(1, EEG.trials); % Initialize the array for marked trials
+        EEG.reject.rejmanualE = zeros(length(EEG.chanlocs), EEG.trials);
+
+        % Loop over channels and epochs
+        for ichan = 1:length(EEG.chanlocs)-2 % exclude last two channels (VEOG & HEOG)
+            for itrial = 1:EEG.trials
+                gradient = max( abs( diff(EEG.data(ichan, :, itrial)) ) );
+                ampliMax = max(EEG.data(ichan, :, itrial));
+                ampliMin = min(EEG.data(ichan, :, itrial));
+                for iwin = 1:length(winidx)-1
+                    [winmin, winmax] = bounds(EEG.data( ichan, winidx(iwin):winidx(iwin)+winpnts-1, itrial));
+                    windiff(iwin) = diff([winmin, winmax]);
+                end
+                diffV = max(windiff);
+
+                if gradient > 30  % do not include amplitude and diff criterium, since eyeblinks are kept in data:  || ampliMax > 75 || ampliMin < -75 || diffV > 100  
+                    EEG.reject.rejmanual(1,itrial) = 1; % Mark the trial when a criterium is met
+                    EEG.reject.rejmanualE(ichan,itrial) = 1;
+                end
+            end
+        end
+
+        % View the marked trials in plot
+        %   Scale value to 80 and 25 epochs per window. Pay attention to VEOG.
+        %   Reject the three epochs on/around tACS artifact 
+        %   Don't reject eyeblinks -> remove by ICA
+        rej_epocs(subj_i,1+sess_i) = EEG.trials; % Save total number of epochs
+        find(EEG.reject.rejmanual > 0) % See the marked epoch numbers
+        pop_eegplot( EEG, 1, 1, 1); % Plot data with marked epochs
+        
+        m1 = -1 ;
+        while m1 == -1
+            m1 = input('How many epochs rejected?: ','s');
+            while isempty(m1)
+                m1 = input('How many epochs rejected? [enter number]: ','s');
+            end
+        end
+        rej_epocs(subj_i,1+sess_i+1) = str2double(m1);
+        EEG.epochdescription         = [m1 '/' num2str(rej_epocs(subj_i,1+sess_i)) ' trials rejected'];
+
+        % Save
+        fprintf('\n****\nSave clean data subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
+        SaveName = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG_inclBlinks.set'];
+        EEG      = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
+
+        m2 = 0;
+        while m2 == 0
+            m2 = input('Continue? [Y/N] ','s');
+            if m2 == 'Y'
+                continue
+            else
+                return
+            end
+        end
+
+        clear EEG
+        ALLEEG(1:end) = [];
     end
 end
 
