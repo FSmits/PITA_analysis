@@ -1,7 +1,7 @@
 %% EEG pre-processing - PITA - all data
 
 %% NOTE!
-% Stimulatie NIET uitgevoerd bij (subjectID-sessie):
+% Geen stimulatie uitgevoerd bij (subjectID-sessie):
 % 297-2 - REAL tACS - LE, AQM   - Notes: Matlab gaf foutmelding, fenne is gekomen om te helpen, zijn ongeveer een uur later begonnen dan gepland
 % 334-1 - REAL tACS - MvK, RK   - none
 % 396-1 - REAL tACS - AQM, FMS  - none
@@ -15,10 +15,11 @@
 % 524-1 - SHAM      - AQM, RK   - none
 % 559-2 - SHAM      - AQM, MvK  - Notes: Participant was vergeten het tacs script aan te zetten dus een half uur kwam ik daar achter en toen heeft ze het aangezet. [Added note: maar stimulator heeft niet gedraaid, ook niet toen script wel heeft gerund]
 % 710-1 - SHAM      - Mvk, RK   - none
+%
 % Besluit > Excludeer ppn bij wie stimulatie niet is uitgevoerd tijdens real tACS sessie.
 % Dat zijn ppn: 297, 334, 396, 602, 626, 913.
 % Behoud ppn bij wie stimulatie niet is uitgevoerd in sham sessie
-
+%
 % full_subj_list = [669	557 363	638	602	989	383	502	733	442	575	913 710	262 ...
 %       752 227	565	626 334	362	600	121	319 923	915	298	202	692	275	...
 %       508 291	803	755	681	876	134	559	396	818	601	297	524	883	193	642];
@@ -41,10 +42,15 @@ Path2EEGbdf  = '/Users/fsmits2/Downloads/1 EEG data tacs-eeg/';
 Path2EEGsets = '/Users/fsmits2/Downloads/1 EEG data tacs-eeg/3 EEG sets processed';
 
 % enter subject names
-subj_list =[669	557 363	638	989	383	502	733	442	575	710	262 ...
+% subj_list =[669	557 363	638	989	383	502	733	442	575	710	262 ...
+%     752 227	565	362	600	121	319 923	915	298	202	692	275	...
+%     508 291	803	755	681	876	134	559	818	601	524	883	193	642];
+sessions  = [1 2];
+
+% 669	557 363 638	
+subj_list =[	989	383	502	733	442	575	710	262 ...
     752 227	565	362	600	121	319 923	915	298	202	692	275	...
     508 291	803	755	681	876	134	559	818	601	524	883	193	642];
-sessions  = [1 2];
 
 % enter filenames
 recording1 = 'restingstate-pretACS-';
@@ -113,55 +119,81 @@ for subj_i = 1:length(subj_list)
             find(strcmpi( {EEG.event.type}, ':Failing electrode' )),...
             find(strcmpi( {EEG.event.type}, ':breathing' )) ]);
 
-        % exceptions
-        if subj_list(subj_i) == 669  &&  sess_i == 2
-            tACS_begin([2 12 14 24])  = []; % events 4, 31, 36, 64
-        elseif subj_list(subj_i) == 915  &&  sess_i == 1
-            tACS_begin([2 12 14 24])  = []; % events 5 32 37 65
-        elseif subj_list(subj_i) == 202  &&  sess_i == 1
-            tACS_begin([2 12 14 24])  = []; % events 4 33 38 66
-        elseif subj_list(subj_i) == 298  &&  sess_i == 1
-            tACS_begin([2 4 14 24])  = []; % events 4 9 38 67
-        elseif subj_list(subj_i) == 638  &&  sess_i == 2
-            tACS_begin([15 17 23])    = []; % events 44, 49, 65
-        elseif subj_list(subj_i) == 710  &&  sess_i == 1
-            tACS_begin([7 9 23])  = []; % events 19, 24,65
-        elseif subj_list(subj_i) == 227  &&  sess_i == 2
-            tACS_begin([5 15 17 24])  = []; % events 14 42 47 66
-        elseif subj_list(subj_i) == 334  &&  sess_i == 1
-            tACS_begin([3 5 17 24])  = []; % events 7 12 48 68
-        elseif subj_list(subj_i) == 319  &&  sess_i == 2
-            tACS_begin([1 11 13 15 25])  = []; % events 1 30 35 39 67
-        elseif subj_list(subj_i) == 923  &&  sess_i == 1
-            tACS_begin([6 15 17 19 25])  = []; % events 16 42 46 51 67
-        elseif subj_list(subj_i) == 298  &&  sess_i == 2
-            tACS_begin([9 11 21 23 25])  = []; % events 25 30 57 62 66
-        elseif subj_list(subj_i) == 275  &&  sess_i == 2
-            tACS_begin([4 6 23])  = []; % event 10 15 64
-        elseif subj_list(subj_i) == 508  &&  sess_i == 1
-            tACS_begin([16 18 23 ])  = []; % event 47 51 64
-        elseif subj_list(subj_i) == 291  &&  sess_i == 1
-            tACS_begin([3 13 24 25])  = []; % event 6 35 68 69
-        elseif subj_list(subj_i) == 876  &&  sess_i == 2
-            tACS_begin([2 22])  = []; % event 5 63
-        elseif subj_list(subj_i) == 559  &&  sess_i == 1
-            tACS_begin([16 18 23])  = []; % event 46 51 64
-        elseif subj_list(subj_i) == 396  &&  sess_i == 1
-            tACS_begin([6 16 23])  = []; % event 16 45 65
-        end
-
-        if length(tACS_begin)>19
-            tACS_begin  = tACS_begin(1:20);
-        end
-
         % find trigger for tACS offset   (original code = '6'. Other possibile codes = '7' , ':sweat' , ':50/60 Hz mains interference'.)
         tACS_end = sort([find(strcmpi( {EEG.event.type}, '6' )), ...
             find(strcmpi( {EEG.event.type}, '7' )), ...
             find(strcmpi( {EEG.event.type}, ':50/60 Hz mains interference' )), ...
             find(strcmpi( {EEG.event.type}, ':sweat' )) ]);
-        if length(tACS_end) > 30
-            tACS_end = tACS_end(2:2:40);
+
+        % when too many trigger codes are found, select codes that show >90-second trigger-to-trigger delay (tACS_begin and tACS_end triggers are separated by ~92 seconds: 60 seconds stimulation + 30 second EEG recording period + 2 seconds ramp-up/ramp-down stimulation)
+        if length(tACS_begin) > 21
+            evlat = [];
+            for eventi = 1:length(tACS_begin)
+                evlat(eventi) = EEG.event(tACS_begin(eventi)).latency / EEG.srate; %save event latencies in array
+            end
+            evlat90_begin  = find( diff(evlat) > 90) + 1; %find which events have a latency difference of >90 seconds
+            tACS_begin     = [tACS_begin(1) tACS_begin(evlat90_begin)];
+            evlat90_begin  = [];
         end
+        if length(tACS_end) > 21
+            evlat = [];
+            for eventi = 1:length(tACS_end)
+                evlat(eventi) = EEG.event(tACS_end(eventi)).latency / EEG.srate; %save event latencies in array
+            end
+            evlat90_end  = find( diff(evlat) > 90) + 1; %find which events have a latency difference of >90 seconds
+            tACS_end     = [tACS_end(1) tACS_end(evlat90_end)];
+            evlat90_end  = [];
+        end
+
+
+%         % exceptions
+%         if subj_list(subj_i) == 669  &&  sess_i == 2
+%             tACS_begin([2 12 14 24])  = []; % events 4, 31, 36, 64
+%         elseif subj_list(subj_i) == 915  &&  sess_i == 1
+%             tACS_begin([2 12 14 24])  = []; % events 5 32 37 65
+%         elseif subj_list(subj_i) == 202  &&  sess_i == 1
+%             tACS_begin([2 12 14 24])  = []; % events 4 33 38 66
+%         elseif subj_list(subj_i) == 298  &&  sess_i == 1
+%             tACS_begin([2 4 14 24])  = []; % events 4 9 38 67
+%         elseif subj_list(subj_i) == 638  &&  sess_i == 2
+%             tACS_begin([15 17 23])    = []; % events 44, 49, 65
+%         elseif subj_list(subj_i) == 710  &&  sess_i == 1
+%             tACS_begin([7 9 23])  = []; % events 19, 24,65
+%         elseif subj_list(subj_i) == 227  &&  sess_i == 2
+%             tACS_begin([5 15 17 24])  = []; % events 14 42 47 66
+%         elseif subj_list(subj_i) == 334  &&  sess_i == 1
+%             tACS_begin([3 5 17 24])  = []; % events 7 12 48 68
+%         elseif subj_list(subj_i) == 319  &&  sess_i == 2
+%             tACS_begin([1 11 13 15 25])  = []; % events 1 30 35 39 67
+%         elseif subj_list(subj_i) == 923  &&  sess_i == 1
+%             tACS_begin([6 15 17 19 25])  = []; % events 16 42 46 51 67
+%         elseif subj_list(subj_i) == 298  &&  sess_i == 2
+%             tACS_begin([9 11 21 23 25])  = []; % events 25 30 57 62 66
+%         elseif subj_list(subj_i) == 275  &&  sess_i == 2
+%             tACS_begin([4 6 23])  = []; % event 10 15 64
+%         elseif subj_list(subj_i) == 508  &&  sess_i == 1
+%             tACS_begin([16 18 23 ])  = []; % event 47 51 64
+%         elseif subj_list(subj_i) == 291  &&  sess_i == 1
+%             tACS_begin([3 13 24 25])  = []; % event 6 35 68 69
+%         elseif subj_list(subj_i) == 876  &&  sess_i == 2
+%             tACS_begin([2 22])  = []; % event 5 63
+%         elseif subj_list(subj_i) == 559  &&  sess_i == 1
+%             tACS_begin([16 18 23])  = []; % event 46 51 64
+%         elseif subj_list(subj_i) == 396  &&  sess_i == 1
+%             tACS_begin([6 16 23])  = []; % event 16 45 65
+%         end
+% 
+%         if length(tACS_begin)>19
+%             tACS_begin  = tACS_begin(1:20);
+%         end
+%
+%         % exceptions
+%         if subj_list(subj_i) == 669  &&  sess_i == 2
+%             tACS_end  = tACS_end([1:2:12 13 14:2:19 21:2:end]); 
+%         end
+%         if length(tACS_end) > 30
+%             tACS_end = tACS_end(2:2:end);
+%         end
 
         % re-code to original code for tACS onsets and offsets
         for trig_i = 1:length(tACS_end)
@@ -209,6 +241,9 @@ for subj_i = 1:length(subj_list)
     end
 end
 
+
+
+
 %% Verify stimulator was on during tACS procedure in each individual dataset
 
 % enter subject identification numbers
@@ -247,6 +282,8 @@ end
 
 %% Pre-processing steps: insert time triggers, re-reference, downsample, filter, create bipolar EOG channels
 
+% 638 session 2 -- Number of events: 449 
+
 for subj_i = 1:length(subj_list)
     for sess_i = 1:length(sessions)
 
@@ -256,6 +293,24 @@ for subj_i = 1:length(subj_list)
 
         % Load EEG set
         EEG      = pop_loadset('filename', [fileName, '_RawEEG.set'], 'filepath', Path2EEGsets);
+
+        % Check if all EEG-recording episodes are present
+        m0 = -1 ;
+        fprintf([ num2str(subj_list(subj_i)) ' session ' num2str(sessions(sess_i)) ' -- Number of events: ' num2str(length(EEG.event)) ' \n '])
+        while m0 == -1
+            if length(EEG.event) < 600
+                m0 = input('Continue? Y/N: ','s');
+                if m0 == 'Y'
+                    continue
+                else 
+                    m0 = 0;
+                    return
+                end
+            else
+                m0 = 0;
+                continue
+            end
+        end
 
         % Re-reference to avg mastoids
         mastoid1 = find(strcmpi( {EEG.chanlocs.labels}, 'EXG5' ));
