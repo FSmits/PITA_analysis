@@ -24,6 +24,45 @@
 %       752 227	565	626 334	362	600	121	319 923	915	298	202	692	275	...
 %       508 291	803	755	681	876	134	559	396	818	601	297	524	883	193	642];
 
+
+
+
+% %% Verify stimulator was on during tACS procedure in each individual dataset
+% 
+% % enter subject identification numbers
+% full_subj_list =   [669	557 363	638	602	989	383	502	733	442	575	913 710	262 ...
+%     752 227	565	626 334	362	600	121	319 923	915	298	202	692	275	...
+%     508 291	803	755	681	876	134	559	396	818	601	297	524	883	193	642];
+% 
+% for subj_i = 1:length(full_subj_list)
+%     for sess_i = 1:length(sessions)
+% 
+%         fprintf('\n****\nStart processing subject %i session %i\n****\n\n', full_subj_list(subj_i), sessions(sess_i));
+% 
+%         fileName = ['TACSEEG-' num2str(full_subj_list(subj_i)) '-' num2str(sess_i)];
+% 
+%         % Load EEG set
+%         EEG      = pop_loadset('filename', [fileName, '_RawEEG.set'], 'filepath', Path2EEGsets);
+% 
+%         % Plot data and check if tACS artifact is visible. If not - check if stimulation was carried out correctly.
+%         pop_eegplot( EEG, 1, 1, 1);
+% 
+%         % Check if tACS has been carried out by checking the typical tACS artifact
+%         m = 0 ;
+%         while m == 0
+%             m = input('Do you see tACS artifacts? Y/N:','s');
+%             if m == 'N'
+%                 writecell( { ['tACS-EEG-' num2str(full_subj_list(subj_i)) '-' num2str(sess_i)] } , ...
+%                     ['/Users/fsmits2/Downloads/1 EEG data tacs-eeg/3 EEG sets processed/' ...
+%                     ['noStim-' num2str(full_subj_list(subj_i)) '-' num2str(sess_i) '.txt']]);
+%                 continue
+%             elseif m == 'Y'
+%                 counter = counter + 1;
+%             end
+%         end
+%     end
+% end
+
 %% Start by clearing workspace
 
 clear
@@ -42,15 +81,11 @@ Path2EEGbdf  = '/Users/fsmits2/Downloads/1 EEG data tacs-eeg/';
 Path2EEGsets = '/Users/fsmits2/Downloads/1 EEG data tacs-eeg/3 EEG sets processed';
 
 % enter subject names
-% subj_list =[669	557 363	638	989	383	502	733	442	575	710	262 ...
-%     752 227	565	362	600	121	319 923	915	298	202	692	275	...
-%     508 291	803	755	681	876	134	559	818	601	524	883	193	642];
-sessions  = [1 2];
-
-% 669	557 363 638	
-subj_list =[	989	383	502	733	442	575	710	262 ...
+subj_list =[669	557 363	638	989	383	502	733	442	575	710	262 ...
     752 227	565	362	600	121	319 923	915	298	202	692	275	...
     508 291	803	755	681	876	134	559	818	601	524	883	193	642];
+sessions  = [1 2];
+
 
 % enter filenames
 recording1 = 'restingstate-pretACS-';
@@ -145,56 +180,6 @@ for subj_i = 1:length(subj_list)
             evlat90_end  = [];
         end
 
-
-%         % exceptions
-%         if subj_list(subj_i) == 669  &&  sess_i == 2
-%             tACS_begin([2 12 14 24])  = []; % events 4, 31, 36, 64
-%         elseif subj_list(subj_i) == 915  &&  sess_i == 1
-%             tACS_begin([2 12 14 24])  = []; % events 5 32 37 65
-%         elseif subj_list(subj_i) == 202  &&  sess_i == 1
-%             tACS_begin([2 12 14 24])  = []; % events 4 33 38 66
-%         elseif subj_list(subj_i) == 298  &&  sess_i == 1
-%             tACS_begin([2 4 14 24])  = []; % events 4 9 38 67
-%         elseif subj_list(subj_i) == 638  &&  sess_i == 2
-%             tACS_begin([15 17 23])    = []; % events 44, 49, 65
-%         elseif subj_list(subj_i) == 710  &&  sess_i == 1
-%             tACS_begin([7 9 23])  = []; % events 19, 24,65
-%         elseif subj_list(subj_i) == 227  &&  sess_i == 2
-%             tACS_begin([5 15 17 24])  = []; % events 14 42 47 66
-%         elseif subj_list(subj_i) == 334  &&  sess_i == 1
-%             tACS_begin([3 5 17 24])  = []; % events 7 12 48 68
-%         elseif subj_list(subj_i) == 319  &&  sess_i == 2
-%             tACS_begin([1 11 13 15 25])  = []; % events 1 30 35 39 67
-%         elseif subj_list(subj_i) == 923  &&  sess_i == 1
-%             tACS_begin([6 15 17 19 25])  = []; % events 16 42 46 51 67
-%         elseif subj_list(subj_i) == 298  &&  sess_i == 2
-%             tACS_begin([9 11 21 23 25])  = []; % events 25 30 57 62 66
-%         elseif subj_list(subj_i) == 275  &&  sess_i == 2
-%             tACS_begin([4 6 23])  = []; % event 10 15 64
-%         elseif subj_list(subj_i) == 508  &&  sess_i == 1
-%             tACS_begin([16 18 23 ])  = []; % event 47 51 64
-%         elseif subj_list(subj_i) == 291  &&  sess_i == 1
-%             tACS_begin([3 13 24 25])  = []; % event 6 35 68 69
-%         elseif subj_list(subj_i) == 876  &&  sess_i == 2
-%             tACS_begin([2 22])  = []; % event 5 63
-%         elseif subj_list(subj_i) == 559  &&  sess_i == 1
-%             tACS_begin([16 18 23])  = []; % event 46 51 64
-%         elseif subj_list(subj_i) == 396  &&  sess_i == 1
-%             tACS_begin([6 16 23])  = []; % event 16 45 65
-%         end
-% 
-%         if length(tACS_begin)>19
-%             tACS_begin  = tACS_begin(1:20);
-%         end
-%
-%         % exceptions
-%         if subj_list(subj_i) == 669  &&  sess_i == 2
-%             tACS_end  = tACS_end([1:2:12 13 14:2:19 21:2:end]); 
-%         end
-%         if length(tACS_end) > 30
-%             tACS_end = tACS_end(2:2:end);
-%         end
-
         % re-code to original code for tACS onsets and offsets
         for trig_i = 1:length(tACS_end)
             EEG = pop_editeventvals(EEG,'changefield', {tACS_begin(trig_i) 'type' 'tACS_start'});
@@ -243,46 +228,7 @@ end
 
 
 
-
-%% Verify stimulator was on during tACS procedure in each individual dataset
-
-% enter subject identification numbers
-full_subj_list =   [669	557 363	638	602	989	383	502	733	442	575	913 710	262 ...
-    752 227	565	626 334	362	600	121	319 923	915	298	202	692	275	...
-    508 291	803	755	681	876	134	559	396	818	601	297	524	883	193	642];
-
-for subj_i = 1:length(full_subj_list)
-    for sess_i = 1:length(sessions)
-
-        fprintf('\n****\nStart processing subject %i session %i\n****\n\n', full_subj_list(subj_i), sessions(sess_i));
-
-        fileName = ['TACSEEG-' num2str(full_subj_list(subj_i)) '-' num2str(sess_i)];
-
-        % Load EEG set
-        EEG      = pop_loadset('filename', [fileName, '_RawEEG.set'], 'filepath', Path2EEGsets);
-
-        % Plot data and check if tACS artifact is visible. If not - check if stimulation was carried out correctly.
-        pop_eegplot( EEG, 1, 1, 1);
-
-        % Check if tACS has been carried out by checking the typical tACS artifact
-        m = 0 ;
-        while m == 0
-            m = input('Do you see tACS artifacts? Y/N:','s');
-            if m == 'N'
-                writecell( { ['tACS-EEG-' num2str(full_subj_list(subj_i)) '-' num2str(sess_i)] } , ...
-                    ['/Users/fsmits2/Downloads/1 EEG data tacs-eeg/3 EEG sets processed/' ...
-                    ['noStim-' num2str(full_subj_list(subj_i)) '-' num2str(sess_i) '.txt']]);
-                continue
-            elseif m == 'Y'
-                counter = counter + 1;
-            end
-        end
-    end
-end
-
-%% Pre-processing steps: insert time triggers, re-reference, downsample, filter, create bipolar EOG channels
-
-% 638 session 2 -- Number of events: 449 
+%% Pre-processing steps: re-reference, downsample, filter, create bipolar EOG channels
 
 for subj_i = 1:length(subj_list)
     for sess_i = 1:length(sessions)
@@ -320,7 +266,7 @@ for subj_i = 1:length(subj_list)
         % Downsample & Filter
         EEG      = pop_resample( EEG, 256); % Downsample the data from 2048 to 256 Hz
         EEG      = pop_basicfilter( EEG, 1:32 , 'Cutoff',  0.5, 'Design', 'butter', 'Filter', 'highpass', 'Order',  4 ); % Format: pop_basicfilter( EEG, chanArray, parameters )
-        EEG      = pop_basicfilter( EEG, 1:32 , 'Cutoff',   35, 'Design', 'butter', 'Filter',  'lowpass', 'Order',  4 );   % % IIR Butterworth filters highpass 0.5 Hz, lowpass 35 Hz, filter order 4 (-24 dB rolloff).
+        EEG      = pop_basicfilter( EEG, 1:32 , 'Cutoff',   35, 'Design', 'butter', 'Filter',  'lowpass', 'Order',  4 ); % IIR Butterworth filters highpass 0.5 Hz, lowpass 35 Hz, filter order 4 (-24 dB rolloff).
 
         % Create eye channel bipolar signals
         EOG_ch   = find(strcmpi({EEG.chanlocs.labels},'EXG1')):find(strcmpi({EEG.chanlocs.labels},'EXG4')); % Find indices EOG electrodes (EXG1, EXG2, EXG3, EXG4) & EEG scalp electrodes
@@ -347,17 +293,9 @@ end
 
 %% Clean the data
 
-% initiate time/period-related triggers
-secs      = 30; % 30 seconden data na elke tACS stimulatie
-stims     = 20; % 20 tACS stimulaties in totaal
-trig_base = repmat(0.01:0.01:0.30,[stims,1]);
-stim_mat  = repmat(1:stims,[secs,1])';
-trigs     = trig_base + stim_mat; % Trigger names are: #stimulation as integer, #second of data following that stimulation as decimal
-trigs     = reshape(trigs', [1,numel(trigs)]);
-trigs     = num2cell(trigs);
-
-% initialize matrix to save no. of rejected epochs per subject:
-rej_epocs = [subj_list'  nan(length(subj_list),length(sessions)*2)];
+% initiate cellarray for to-be-excluded datasets due to gel bridges and matrix to save no. of rejected epochs per subject:
+gelbridges = [subj_list'  nan(length(subj_list),length(sessions))];
+rej_epocs  = [subj_list'  nan(length(subj_list),length(sessions)*2)];
 
 % Loop over files
 for subj_i = 1:length(subj_list)
@@ -369,13 +307,30 @@ for subj_i = 1:length(subj_list)
         % Load EEG set
         EEG      = pop_loadset('filename', [fileName, '_PreprocEEG.set'], 'filepath', Path2EEGsets);
 
+        % Find the triggers in EEG-recording periods:
+        trigarray = [];
+        for eventi = 1:length(EEG.event)
+            trigarray(eventi) = str2double(EEG.event(eventi).type);
+        end
+        rejects_char = find( isnan( trigarray) );
+        rejects_num  = find( trigarray == 8 | trigarray == 7 | trigarray == 6 | trigarray == 5 );
+        trigarray( [rejects_char rejects_num] ) = [];
+
+        % Plot
+        pop_eegplot(EEG,1,1,1);
+
         % Interpolate bad channels
-        pop_eegplot(EEG,1,1,1)
-        m0 = 0;
-        while m0 == 0
+        k0 = [];
+        m0 = -1;
+        while m0 == -1
             m0 = str2double( input('How many bad channels (interpolation needed?) ','s') );
         end
         m0s = num2cell(nan(1,m0));
+        k0 = input('Gel bridge? [1 = yes / 0 = no] ');
+        if k0 == 1
+            gelbridges(subj_i,sess_i+1) = 1;
+            return
+        end
         if m0 > 0
             for badchani = 1:m0
                 badchan =  input(['Which channel to interpolate? nr ' num2str(badchani) ' ' ],'s');
@@ -387,7 +342,7 @@ for subj_i = 1:length(subj_list)
         end
 
         % Divide into 1-sec epochs
-        EEG = pop_epoch( EEG, trigs,  [0  1], 'epochinfo', 'yes');
+        EEG = pop_epoch( EEG, num2cell(trigarray),  [0  1], 'epochinfo', 'yes');
 
         % Semi-automatic artifact rejection
         %     Gradient:  Specifies that the absolute difference between two adjacent sample points of data must not exceed a value (artifact of weird spikes). Starting values from Boost tutorial: Gradient: 75 μV
@@ -399,6 +354,15 @@ for subj_i = 1:length(subj_list)
         windiff = nan(1,length(winidx));
         EEG.reject.rejmanual = zeros(1, EEG.trials); % Initialize the array for marked trials
         EEG.reject.rejmanualE = zeros(length(EEG.chanlocs), EEG.trials);
+
+        % Reject epoch 02, 03 and 04 (3 epochs around after-tACS-artifact)
+        for itrial = 1:EEG.trials
+            itrig = find( [EEG.event.epoch] == itrial );
+            trig  = str2double(EEG.event(itrig(1)).type);
+            if floor(trig)==trig-.02 || floor(trig)==trig-.03 || floor(trig)==trig-.04
+                EEG.reject.rejmanual(1,itrial) = 2;
+            end
+        end
 
         % Loop over channels and epochs
         for ichan = 1:length(EEG.chanlocs)-2 % exclude last two channels (VEOG & HEOG)
