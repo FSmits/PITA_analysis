@@ -294,8 +294,9 @@ end
 %% Clean the data
 
 % initiate cellarray for to-be-excluded datasets due to gel bridges and matrix to save no. of rejected epochs per subject:
-gelbridges = [subj_list'  nan(length(subj_list),length(sessions))];
+gelbridges = [subj_list'  zeros(length(subj_list),length(sessions))];
 rej_epocs  = [subj_list'  nan(length(subj_list),length(sessions)*2)];
+intrp_chans = num2cell(subj_list');
 
 % Loop over files
 for subj_i = 1:length(subj_list)
@@ -329,18 +330,21 @@ for subj_i = 1:length(subj_list)
         k0 = input('Gel bridge? [1 = yes / 0 = no] ');
         if k0 == 1
             gelbridges(subj_i,sess_i+1) = 1;
-            return
+           % continue
         end
+        badchan = {[]};
         if m0 > 0
             for badchani = 1:m0
-                badchan =  input(['Which channel to interpolate? nr ' num2str(badchani) ' ' ],'s');
-                chan2interp = find( strcmpi( badchan, {EEG.chanlocs.labels} ));
+                badchan{badchani} = input(['Which channel to interpolate? nr ' num2str(badchani) ' ' ],'s');
+                chan2interp       = find( strcmpi( badchan{badchani}, {EEG.chanlocs.labels} ));
                 % Enter channel locations
                 EEG = pop_chanedit(EEG, 'lookup','/Users/fsmits2/Downloads/eeglab2021.0/plugins/dipfit/standard_BESA/standard-10-5-cap385.elp');
                 EEG = pop_interp(EEG, chan2interp, 'spherical');
             end
         end
-
+        intrp_chans{subj_i,sess_i+1} = badchan;
+        EEG.eventdescription = { {'Interpolated channels: '} badchan };
+        
         % Divide into 1-sec epochs
         EEG = pop_epoch( EEG, num2cell(trigarray),  [0  1], 'epochinfo', 'yes');
 
@@ -398,13 +402,15 @@ for subj_i = 1:length(subj_list)
                 m1 = input('How many epochs rejected? [enter number]: ','s');
             end
         end
-        rej_epocs(subj_i,1+sess_i+1) = str2double(m1);
+        rej_epocs(subj_i,3+sess_i) = str2double(m1);
         EEG.epochdescription         = [m1 '/' num2str(rej_epocs(subj_i,1+sess_i)) ' trials rejected'];
 
         % Save
         fprintf('\n****\nSave clean data subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
         SaveName = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG_inclBlinks.set'];
         EEG      = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
+        writematrix(rej_epocs, [Path2EEGsets '/Overview_rejected_epochs_'      char(datetime('today')) '.txt'], 'Delimiter',';');
+        writecell(intrp_chans, [Path2EEGsets '/Overview_interpolated_channels' char(datetime('today')) '.txt'], 'Delimiter',';');
 
         m2 = 0;
         while m2 == 0
