@@ -294,9 +294,10 @@ end
 %% Clean the data
 
 % initiate cellarray for to-be-excluded datasets due to gel bridges and matrix to save no. of rejected epochs per subject:
-gelbridges = [subj_list'  zeros(length(subj_list),length(sessions))];
-rej_epocs  = [subj_list'  nan(length(subj_list),length(sessions)*2)];
-intrp_chans = num2cell(subj_list');
+gelbridges       = [subj_list'  zeros(length(subj_list),length(sessions))];
+rej_epocs        = [subj_list'  nan(length(subj_list),length(sessions)*2)];
+intrp_chans      = cell(length(subj_list),3);
+intrp_chans(:,1) = num2cell(subj_list');
 
 % Loop over files
 for subj_i = 1:length(subj_list)
@@ -342,8 +343,12 @@ for subj_i = 1:length(subj_list)
                 EEG = pop_interp(EEG, chan2interp, 'spherical');
             end
         end
-        intrp_chans{subj_i,sess_i+1} = badchan;
-        EEG.eventdescription = { {'Interpolated channels: '} badchan };
+        if isempty(cell2mat(badchan))
+            intrp_chans{subj_i,sess_i+1} = '0';
+        else
+            intrp_chans{subj_i,sess_i+1} = string(badchan);
+        end
+        EEG.eventdescription         = { {'Interpolated channels: '} badchan };
         
         % Divide into 1-sec epochs
         EEG = pop_epoch( EEG, num2cell(trigarray),  [0  1], 'epochinfo', 'yes');
