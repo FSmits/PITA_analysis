@@ -162,22 +162,22 @@ for subj_i = 1:length(subj_list)
 
         % when too many trigger codes are found, select codes that show >90-second trigger-to-trigger delay (tACS_begin and tACS_end triggers are separated by ~92 seconds: 60 seconds stimulation + 30 second EEG recording period + 2 seconds ramp-up/ramp-down stimulation)
         if length(tACS_begin) > 21
+            evlat90_begin = [];
             evlat = [];
             for eventi = 1:length(tACS_begin)
                 evlat(eventi) = EEG.event(tACS_begin(eventi)).latency / EEG.srate; %save event latencies in array
             end
             evlat90_begin  = find( diff(evlat) > 90) + 1; %find which events have a latency difference of >90 seconds
             tACS_begin     = [tACS_begin(1) tACS_begin(evlat90_begin)];
-            evlat90_begin  = [];
         end
         if length(tACS_end) > 21
+            evlat90_end = [];
             evlat = [];
             for eventi = 1:length(tACS_end)
                 evlat(eventi) = EEG.event(tACS_end(eventi)).latency / EEG.srate; %save event latencies in array
             end
             evlat90_end  = find( diff(evlat) > 90) + 1; %find which events have a latency difference of >90 seconds
             tACS_end     = [tACS_end(1) tACS_end(evlat90_end)];
-            evlat90_end  = [];
         end
 
         % re-code to original code for tACS onsets and offsets
@@ -291,34 +291,25 @@ end
 
 
 
-%% Clean the data
+%% Interpolate channels and detect gel bridges
 
-% initiate cellarray for to-be-excluded datasets due to gel bridges and matrix to save no. of rejected epochs per subject:
-gelbridges       = [subj_list'  zeros(length(subj_list),length(sessions))];
-rej_epocs        = [subj_list'  nan(length(subj_list),length(sessions)*2)];
+% initiate or load matrix/cellarray for gel bridges and interpolated channels per subject:
+gelbridges       = [subj_list'  nan(length(subj_list),length(sessions))];
 intrp_chans      = cell(length(subj_list),3);
 intrp_chans(:,1) = num2cell(subj_list');
 
+gelbridges       = table2array( readtable( [Path2EEGsets '/Overview_gelbridges_'           char(datetime('today')) '.txt'] ) );
+intrp_chans      = table2cell(  readtable( [Path2EEGsets '/Overview_interpolated_channels' char(datetime('today')) '.txt'] ) );
+
 % Loop over files
-for subj_i = 1:length(subj_list)
+for subj_i = 2:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
         fileName = ['TACSEEG-' num2str(subj_list(subj_i)) '-' num2str(sess_i)];
 
-        % Load EEG set
+        % Load and plot EEG set
         EEG      = pop_loadset('filename', [fileName, '_PreprocEEG.set'], 'filepath', Path2EEGsets);
-
-        % Find the triggers in EEG-recording periods:
-        trigarray = [];
-        for eventi = 1:length(EEG.event)
-            trigarray(eventi) = str2double(EEG.event(eventi).type);
-        end
-        rejects_char = find( isnan( trigarray) );
-        rejects_num  = find( trigarray == 8 | trigarray == 7 | trigarray == 6 | trigarray == 5 );
-        trigarray( [rejects_char rejects_num] ) = [];
-
-        % Plot
         pop_eegplot(EEG,1,1,1);
 
         % Interpolate bad channels
@@ -331,7 +322,8 @@ for subj_i = 1:length(subj_list)
         k0 = input('Gel bridge? [1 = yes / 0 = no] ');
         if k0 == 1
             gelbridges(subj_i,sess_i+1) = 1;
-           % continue
+        else
+            gelbridges(subj_i,sess_i+1) = 0;
         end
         badchan = {[]};
         if m0 > 0
@@ -349,7 +341,117 @@ for subj_i = 1:length(subj_list)
             intrp_chans{subj_i,sess_i+1} = string(badchan);
         end
         EEG.eventdescription         = { {'Interpolated channels: '} badchan };
-        
+       
+        % Save
+        fprintf('\n****\nSave interpolated channels data subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
+        SaveName = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_intrp.set'];
+        EEG      = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
+        writematrix(gelbridges, [Path2EEGsets '/Overview_gelbridges_'           char(datetime('today')) '.txt'], 'Delimiter',';');
+        writecell(intrp_chans,  [Path2EEGsets '/Overview_interpolated_channels' char(datetime('today')) '.txt'], 'Delimiter',';');
+
+        m2 = 0;
+        while m2 == 0
+            m2 = input('Continue? [Y/N] ','s');
+            if m2 == 'Y'
+                continue
+            else
+                return
+            end
+        end
+
+        clear EEG
+        ALLEEG(1:end) = [];
+    end
+end
+
+
+%% Eyeblink removal via ICA
+
+% Initiate or read matrix to save rejected components per subject:
+ICAcomps      = cell(length(subj_list),3);
+ICAcomps(:,1) = num2cell(subj_list');
+
+ICAcomps      = table2cell(  readtable( [Path2EEGsets '/Overview_ICAcomps_' char(datetime('today')) '.txt'] ) );
+
+% Loop over files
+for subj_i = 1:length(subj_list)
+    for sess_i = 1:length(sessions)
+
+        fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
+        fileName = ['TACSEEG-' num2str(subj_list(subj_i)) '-' num2str(sess_i)];
+
+        % Load EEG set
+        EEG      = pop_loadset('filename', [fileName, '_intrp.set'], 'filepath', Path2EEGsets);
+
+        % Find Eyeblink components with ICA (runica):
+        EEG = pop_runica(EEG, 'icatype', 'runica', 'extended',1,'interrupt','on');
+
+        % Save
+        fprintf('\n****\nSave ICA data subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
+        SaveName = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_intrp_ICAfull.set'];
+        EEG      = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
+        writecell(ICAcomps,  [Path2EEGsets '/Overview_ICAcomps_' char(datetime('today')) '.txt'], 'Delimiter',';');
+  
+        clear EEG
+        ALLEEG(1:end) = [];
+
+    end
+end
+
+
+%% Clean the data
+
+% initiate or load matrix to save no. of rejected epochs per subject:
+rej_epocs        = [subj_list'  nan(length(subj_list),length(sessions)*2)];
+rej_epocs        = table2array( readtable( [Path2EEGsets '/Overview_rejected_epochs_'      char(datetime('today')) '.txt'] ) );
+
+% Loop over files
+for subj_i = 14:length(subj_list)
+    for sess_i = 1:length(sessions)
+
+        fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
+        fileName = ['TACSEEG-' num2str(subj_list(subj_i)) '-' num2str(sess_i)];
+
+        % Load EEG set
+        EEG      = pop_loadset('filename', [fileName, '_intrp_ICAfull.set'], 'filepath', Path2EEGsets);
+
+        % Remove ICA components
+        ALLEEG = EEG;
+        CURRENTSET = 1;
+        pop_eegplot( EEG, 0, 1, 1); % IC's in time domain
+        EEG = pop_chanedit(EEG, 'lookup','/Users/fsmits2/Downloads/eeglab2021.0/plugins/dipfit/standard_BESA/standard-10-5-cap385.elp');
+        pop_selectcomps(EEG, 1:10 ); % IC's on topomaps and ERPs (plot first 10, only the first 20  explain a relevant amount of variance):
+        % Choose which components to remove
+        m = "no";
+        while m ~= "yes"
+            m = input('Are you ready to input components to remove? Type [yes]','s');
+        end
+        m0 = -1;
+        while m0 == -1
+            m0 = str2double( input('How many components to remove? ','s') );
+        end
+        comp = [];
+        if m0 > 0
+            for compi = 1:m0
+                comp(compi) = str2num( input(['Which component to remove? nr: ' num2str(compi) ' ' ],'s') ) ;
+            end
+        end
+        if isempty(comp)
+            ICAcomps{subj_i,sess_i+1} = '0';
+        else
+            ICAcomps{subj_i,sess_i+1} = comp;
+            EEG = pop_subcomp( EEG, comp , 0);
+        end
+
+        % Find and remove irrelevant triggers in EEG-recording periods
+        trigarray = [];
+        for eventi = 1:length(EEG.event)
+            trigarray(eventi) = str2double(EEG.event(eventi).type);
+        end
+        rejects_char = find( isnan( trigarray) );
+        rejects_num  = find( trigarray == 8 | trigarray == 7 | trigarray == 6 | trigarray == 5 );
+        trigarray( [rejects_char rejects_num] ) = [];
+
         % Divide into 1-sec epochs
         EEG = pop_epoch( EEG, num2cell(trigarray),  [0  1], 'epochinfo', 'yes');
 
@@ -364,11 +466,11 @@ for subj_i = 1:length(subj_list)
         EEG.reject.rejmanual = zeros(1, EEG.trials); % Initialize the array for marked trials
         EEG.reject.rejmanualE = zeros(length(EEG.chanlocs), EEG.trials);
 
-        % Reject epoch 02, 03 and 04 (3 epochs around after-tACS-artifact)
+        % Reject epoch 03 (after-tACS-artifact)
         for itrial = 1:EEG.trials
             itrig = find( [EEG.event.epoch] == itrial );
             trig  = str2double(EEG.event(itrig(1)).type);
-            if floor(trig)==trig-.02 || floor(trig)==trig-.03 || floor(trig)==trig-.04
+            if floor(trig)==trig-.03
                 EEG.reject.rejmanual(1,itrial) = 2;
             end
         end
@@ -385,7 +487,7 @@ for subj_i = 1:length(subj_list)
                 end
                 diffV = max(windiff);
 
-                if gradient > 30  % do not include amplitude and diff criterium, since eyeblinks are kept in data:  || ampliMax > 75 || ampliMin < -75 || diffV > 100  
+                if gradient > 30 || ampliMax > 75 || ampliMin < -75 || diffV > 100  
                     EEG.reject.rejmanual(1,itrial) = 1; % Mark the trial when a criterium is met
                     EEG.reject.rejmanualE(ichan,itrial) = 1;
                 end
@@ -394,8 +496,7 @@ for subj_i = 1:length(subj_list)
 
         % View the marked trials in plot
         %   Scale value to 80 and 25 epochs per window. Pay attention to VEOG.
-        %   Reject the three epochs on/around tACS artifact 
-        %   Don't reject eyeblinks -> remove by ICA
+        %   Reject the epoch around tACS artifact 
         rej_epocs(subj_i,1+sess_i) = EEG.trials; % Save total number of epochs
         find(EEG.reject.rejmanual > 0) % See the marked epoch numbers
         pop_eegplot( EEG, 1, 1, 1); % Plot data with marked epochs
@@ -414,9 +515,8 @@ for subj_i = 1:length(subj_list)
         fprintf('\n****\nSave clean data subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
         SaveName = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG_inclBlinks.set'];
         EEG      = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
-        writematrix(rej_epocs, [Path2EEGsets '/Overview_rejected_epochs_'      char(datetime('today')) '.txt'], 'Delimiter',';');
-        writecell(intrp_chans, [Path2EEGsets '/Overview_interpolated_channels' char(datetime('today')) '.txt'], 'Delimiter',';');
-
+        writematrix(rej_epocs,  [Path2EEGsets '/Overview_rejected_epochs_'      char(datetime('today')) '.txt'], 'Delimiter',';');
+        
         m2 = 0;
         while m2 == 0
             m2 = input('Continue? [Y/N] ','s');
@@ -431,5 +531,3 @@ for subj_i = 1:length(subj_list)
         ALLEEG(1:end) = [];
     end
 end
-
-
