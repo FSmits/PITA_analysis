@@ -302,7 +302,7 @@ gelbridges       = table2array( readtable( [Path2EEGsets '/Overview_gelbridges_'
 intrp_chans      = table2cell(  readtable( [Path2EEGsets '/Overview_interpolated_channels' char(datetime('today')) '.txt'] ) ); %char(datetime('yesterday')) '.txt'] ) ); %
 
 % Loop over files
-for subj_i = 2:length(subj_list)
+for subj_i = 1:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
@@ -404,7 +404,7 @@ rej_epocs     = table2array( readtable( [Path2EEGsets '/Overview_rejected_epochs
 ICAcomps      = table2cell(  readtable( [Path2EEGsets '/Overview_ICAcomps_' char(datetime('today')) '.txt'] ) );
 
 % Loop over files
-for subj_i = 4:length(subj_list)
+for subj_i = 23:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
@@ -418,7 +418,7 @@ for subj_i = 4:length(subj_list)
         CURRENTSET = 1;
         pop_eegplot( EEG, 0, 1, 1); % IC's in time domain
         EEG = pop_chanedit(EEG, 'lookup','/Users/fsmits2/Downloads/eeglab2021.0/plugins/dipfit/standard_BESA/standard-10-5-cap385.elp');
-        pop_selectcomps(EEG, 1:10 ); % IC's on topomaps and ERPs (plot first 10, only the first 20  explain a relevant amount of variance):
+        pop_selectcomps(EEG, 1:12 ); % IC's on topomaps and ERPs (plot first 12, only the first 20  explain a relevant amount of variance):
         % Choose which components to remove
         m = "no";
         while m ~= "yes"
@@ -465,15 +465,6 @@ for subj_i = 4:length(subj_list)
         windiff = nan(1,length(winidx));
         EEG.reject.rejmanual = zeros(1, EEG.trials); % Initialize the array for marked trials
         EEG.reject.rejmanualE = zeros(length(EEG.chanlocs), EEG.trials);
-% 
-%         % Reject epoch 03 (after-tACS-artifact)
-%         for itrial = 1:EEG.trials
-%             itrig = find( [EEG.event.epoch] == itrial );
-%             trig  = str2double(EEG.event(itrig(1)).type);
-%             if floor(trig)==trig-.03
-%                 EEG.reject.rejmanual(1,itrial) = 2;
-%             end
-%         end
 
         % Loop over channels and epochs
         for ichan = 1:length(EEG.chanlocs)-2 % exclude last two channels (VEOG & HEOG)
@@ -487,7 +478,7 @@ for subj_i = 4:length(subj_list)
                 end
                 diffV = max(windiff);
 
-                if gradient > 50 || ampliMax > 75 || ampliMin < -75 || diffV > 150  
+                if gradient > 75 || ampliMax > 100 || ampliMin < -100 || diffV > 150  
                     EEG.reject.rejmanual(1,itrial) = 1; % Mark the trial when a criterium is met
                     EEG.reject.rejmanualE(ichan,itrial) = 1;
                 end
