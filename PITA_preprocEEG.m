@@ -277,11 +277,14 @@ for subj_i = 1:length(subj_list)
         EEG.chanlocs( EOG_ch(1) ).labels = 'VEOG'; % EXG1 is now the bipolar VEOG channel. Change channel name.
         EEG.chanlocs( EOG_ch(2) ).labels = 'HEOG'; % EXG3 is now the bipolar HEOG channel. Change channel name.
 
+        % CleanLine (Notch filter via ICA) to remove 50 Hz power line noise
+        EEG      = pop_cleanline(EEG, 'bandwidth',2,'chanlist',[1:30] ,'computepower',1,'linefreqs',50,'newversion',0,'normSpectrum',0,'p',0.01,'pad',2,'plotfigures',0,'scanforlines',0,'sigtype','Channels','taperbandwidth',2,'tau',100,'verb',1,'winsize',4,'winstep',1);
+
         %         pop_eegplot( EEG, 1, 1, 1); % Inspect data
 
         % Save
         fprintf('\n****\nSave pre-processed subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        SaveName = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_PreprocEEG.set'];
+        SaveName = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_PreprocEEGCleanLine.set'];
         EEG = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
 
         clear EEG
@@ -309,7 +312,7 @@ for subj_i = 1:length(subj_list)
         fileName = ['TACSEEG-' num2str(subj_list(subj_i)) '-' num2str(sess_i)];
 
         % Load and plot EEG set
-        EEG      = pop_loadset('filename', [fileName, '_PreprocEEG.set'], 'filepath', Path2EEGsets);
+        EEG      = pop_loadset('filename', [fileName, '_PreprocEEGCleanLine.set'], 'filepath', Path2EEGsets);
         pop_eegplot(EEG,1,1,1);
 
         % Interpolate bad channels
@@ -404,7 +407,7 @@ rej_epocs     = table2array( readtable( [Path2EEGsets '/Overview_rejected_epochs
 ICAcomps      = table2cell(  readtable( [Path2EEGsets '/Overview_ICAcomps_' char(datetime('today')) '.txt'] ) );
 
 % Loop over files
-for subj_i = 23:length(subj_list)
+for subj_i = 39:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
@@ -418,7 +421,7 @@ for subj_i = 23:length(subj_list)
         CURRENTSET = 1;
         pop_eegplot( EEG, 0, 1, 1); % IC's in time domain
         EEG = pop_chanedit(EEG, 'lookup','/Users/fsmits2/Downloads/eeglab2021.0/plugins/dipfit/standard_BESA/standard-10-5-cap385.elp');
-        pop_selectcomps(EEG, 1:12 ); % IC's on topomaps and ERPs (plot first 12, only the first 20  explain a relevant amount of variance):
+        pop_selectcomps(EEG, 1:15 ); % IC's on topomaps and ERPs (plot first 12, only the first 20  explain a relevant amount of variance):
         % Choose which components to remove
         m = "no";
         while m ~= "yes"
