@@ -277,14 +277,14 @@ for subj_i = 1:length(subj_list)
         EEG.chanlocs( EOG_ch(1) ).labels = 'VEOG'; % EXG1 is now the bipolar VEOG channel. Change channel name.
         EEG.chanlocs( EOG_ch(2) ).labels = 'HEOG'; % EXG3 is now the bipolar HEOG channel. Change channel name.
 
-        % CleanLine (Notch filter via ICA) to remove 50 Hz power line noise
-        EEG      = pop_cleanline(EEG, 'bandwidth',2,'chanlist',[1:30] ,'computepower',1,'linefreqs',50,'newversion',0,'normSpectrum',0,'p',0.01,'pad',2,'plotfigures',0,'scanforlines',0,'sigtype','Channels','taperbandwidth',2,'tau',100,'verb',1,'winsize',4,'winstep',1);
+%        % CleanLine (Notch filter via ICA) to remove 50 Hz power line noise
+%        EEG      = pop_cleanline(EEG, 'bandwidth',2,'chanlist',[1:30] ,'computepower',1,'linefreqs',50,'newversion',0,'normSpectrum',0,'p',0.01,'pad',2,'plotfigures',0,'scanforlines',0,'sigtype','Channels','taperbandwidth',2,'tau',100,'verb',1,'winsize',4,'winstep',1);
 
         %         pop_eegplot( EEG, 1, 1, 1); % Inspect data
 
         % Save
         fprintf('\n****\nSave pre-processed subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        SaveName = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_PreprocEEGCleanLine.set'];
+        SaveName = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_PreprocEEG.set'];
         EEG = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
 
         clear EEG
@@ -296,96 +296,20 @@ end
 
 %% Interpolate channels and detect gel bridges
 
-% initiate or load matrix/cellarray for gel bridges and interpolated channels per subject:
-% gelbridges       = [subj_list'  nan(length(subj_list),length(sessions))];
-intrp_chans      = cell(length(subj_list),3);
-intrp_chans(:,1) = num2cell(subj_list');
-
-% gelbridges       = table2array( readtable( [Path2EEGsets '/Overview_gelbridges_'           char(datetime('today')) '.txt'] ) ); %char(datetime('yesterday')) '.txt'] ) ); %
-intrp_chans      = table2cell(  readtable( [Path2EEGsets '/Overview_interpolated_channels' char(datetime('today')) '.txt'] ) ); %char(datetime('yesterday')) '.txt'] ) ); %
-
-% Loop over files
-for subj_i = 36:length(subj_list)
-    for sess_i = 1:length(sessions)
-
-        fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        fileName = ['TACSEEG-' num2str(subj_list(subj_i)) '-' num2str(sess_i)];
-
-        % Load and plot EEG set
-        EEG      = pop_loadset('filename', [fileName, '_PreprocEEGCleanLine.set'], 'filepath', Path2EEGsets);
-        pop_eegplot(EEG,1,1,1);
-
-        % Find channels with high standard deviation to detect noisy channels
-        chansd     = std(EEG.data(1:30, :)');
-        sortsd     = sort(chansd);
-        badsd      = find( chansd > 4*mean( sortsd(1:15) ) );
-        badsdchans = string({EEG.chanlocs(badsd).labels});
-        if isempty(badsdchans)
-            fprintf('No channels >4SD deviation\n');
-        else
-            fprintf('Channel with >4SD deviation: %s\n**\n', badsdchans);
-        end
-       
-        % Interpolate bad channels
+% % Loop over files
+% for subj_i = 1:length(subj_list)
+%     for sess_i = 1:length(sessions)
 %         k0 = [];
-        m0 = [];
-        while isempty(m0)  || isnan(m0)
-            m0 = str2double( input('How many bad channels (interpolation needed?) ','s') );
-        end
-        m0s = num2cell(nan(1,m0));
 %         k0 = input('Gel bridge? [1 = yes / 0 = no] ');
 %         if k0 == 1
 %             gelbridges(subj_i,sess_i+1) = 1;
 %         else
 %             gelbridges(subj_i,sess_i+1) = 0;
 %         end
-        badchan = {[]};
-        if m0 > 0
-            for badchani = 1:m0
-                badchan{badchani} = input(['Which channel to interpolate? nr ' num2str(badchani) ' ' ],'s');
-                chan2interp       = find( strcmpi( badchan{badchani}, {EEG.chanlocs.labels} ));
-                % Enter channel locations
-                EEG = pop_chanedit(EEG, 'lookup','/Users/fsmits2/Downloads/eeglab2021.0/plugins/dipfit/standard_BESA/standard-10-5-cap385.elp');
-                EEG = pop_interp(EEG, chan2interp, 'spherical');
-            end
-            pop_eegplot(EEG,1,1,1);
-        end
-        if isempty(cell2mat(badchan))
-            intrp_chans{subj_i,sess_i+1} = '0';
-        else
-            intrp_chans{subj_i,sess_i+1} = string(badchan);
-        end
-        EEG.eventdescription         = { {'Interpolated channels: '} badchan };
-
-        m02 = [];
-        while isempty(m02) || isnan(m02)
-            m02 = input('Continue to SAVE? [Y/N] ','s');
-        end
-        if m02 == 'N'
-            return
-        end
-       
-        % Save
-        fprintf('\n****\nSave interpolated channels data subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        SaveName = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CLintrp.set'];
-        EEG      = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
+% 
 %         writematrix(gelbridges, [Path2EEGsets '/Overview_gelbridges_'           char(datetime('today')) '.txt'], 'Delimiter',';'); %char(datetime('yesterday')) '.txt'], 'Delimiter',';'); %
-        writecell(intrp_chans,  [Path2EEGsets '/Overview_interpolated_channelsCL' char(datetime('today')) '.txt'], 'Delimiter',';'); %char(datetime('yesterday')) '.txt'], 'Delimiter',';'); %
-
-        m2 = [];
-        while isempty(m2) || isnan(m2)
-            m2 = input('Continue to next subject? [Y/N] ','s');
-            if m2 == 'Y'
-                clear EEG
-                ALLEEG(1:end) = [];
-                continue
-            else
-                return
-            end
-        end
-
-    end
-end
+%     end
+% end
 
 
 %% ICA
@@ -398,14 +322,14 @@ for subj_i = 1:length(subj_list)
         fileName = ['TACSEEG-' num2str(subj_list(subj_i)) '-' num2str(sess_i)];
 
         % Load EEG set
-        EEG      = pop_loadset('filename', [fileName, '_Clintrp.set'], 'filepath', Path2EEGsets);
+        EEG      = pop_loadset('filename', [fileName, '_PreprocEEG.set'], 'filepath', Path2EEGsets);
 
         % Find Eyeblink components with ICA (runica):
         EEG = pop_runica(EEG, 'icatype', 'runica', 'extended',1,'interrupt','on');
 
         % Save
         fprintf('\n****\nSave ICA data subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        SaveName = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CLintrp_ICAfull.set'];
+        SaveName = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_Preproc_ICAfull.set'];
         EEG      = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
           
         clear EEG
@@ -417,26 +341,29 @@ end
 
 %% Clean the data
 
-% initiate or load matrix to save no. of rejected epochs and rejected components per subject and noisy channels:
+% initiate or load matrix to save no. of rejected epochs and rejected components per subject and interpolated and noisy channels:
 rej_epocs     = [subj_list'  nan(length(subj_list),length(sessions)*2)];
 ICAcomps      = cell(length(subj_list),3);
 ICAcomps(:,1) = num2cell(subj_list');
+% intrp_chans      = cell(length(subj_list),3);
+% intrp_chans(:,1) = num2cell(subj_list');
 bdchns        = cell(length(subj_list),3);
 bdchns(:,1)   = num2cell(subj_list');
 
-rej_epocs     = table2array( readtable( [Path2EEGsets '/Overview_CLrejected_epochs_'      char(datetime('today')) '.txt'] ) );
-ICAcomps      = table2cell(  readtable( [Path2EEGsets '/Overview_CLICAcomps_' char(datetime('today')) '.txt'] ) );
-bdchns        = table2cell(  readtable( [Path2EEGsets '/Overview_CLnoisychannels_' char(datetime('today')) '.txt'] ) );
+rej_epocs     = table2array( readtable( [Path2EEGsets '/Overview_rejected_epochs_'      char(datetime('today')) '.txt'] ) );
+ICAcomps      = table2cell(  readtable( [Path2EEGsets '/Overview_ICAcomps_' char(datetime('today')) '.txt'] ) );
+bdchns        = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_' char(datetime('today')) '.txt'] ) );
+% intrp_chans   = table2cell(  readtable( [Path2EEGsets '/Overview_interpolated_channels' char(datetime('today')) '.txt'] ) ); %char(datetime('yesterday')) '.txt'] ) ); %
 
 % Loop over files
-for subj_i = 2:length(subj_list)
+for subj_i = 5:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
         fileName = ['TACSEEG-' num2str(subj_list(subj_i)) '-' num2str(sess_i)];
 
         % Load EEG set
-        EEG      = pop_loadset('filename', [fileName, '_CLintrp_ICAfull.set'], 'filepath', Path2EEGsets);
+        EEG      = pop_loadset('filename', [fileName, '_Preproc_ICAfull.set'], 'filepath', Path2EEGsets);
 
         % Remove ICA components
         ALLEEG = EEG;
@@ -465,9 +392,19 @@ for subj_i = 2:length(subj_list)
             ICAcomps{subj_i,sess_i+1} = comp;
             EEG = pop_subcomp( EEG, comp , 0);
         end
-
-        % Check which channels remain bad and should not be considered further
+        
+        % Find channels with high standard deviation to detect noisy channels
         pop_eegplot( EEG, 1, 1, 1);
+        chansd     = std(EEG.data(1:30, :)');
+        sortsd     = sort(chansd);
+        badsd      = find( chansd > 4*mean( sortsd(1:15) ) );
+        badsdchans = string({EEG.chanlocs(badsd).labels});
+        if isempty(badsdchans)
+            fprintf('No channels >4SD deviation\n');
+        else
+            fprintf('Channel with >4SD deviation: %s\n**\n', badsdchans);
+        end
+        % Check which channels remain bad and should not be considered further
         m3a = "no";
         while m3a ~= "yes"
             m3a = input('Ready to input channels to leave out? Type [yes] ','s');
@@ -476,17 +413,18 @@ for subj_i = 2:length(subj_list)
         while m3 == -1
             m3 = str2double( input('How many channels to leave out? ','s') );
         end
-        badchannels    = {[]};
+        badchannels   = {[]};
         noisychannels = [];
         if m3 > 0
             for bchni = 1:m3
                 badchannels{bchni}   = input(['Which channel to leave out? nr: ' num2str(bchni) ' ' ],'s') ;
                 noisychannels(bchni) = find( strcmpi( badchannels{bchni}, {EEG.chanlocs.labels} ));
             end
-            bdchns{subj_i,sess_i+1} = string(badchannels); 
+            bdchns{subj_i,sess_i+1}  = string(badchannels); 
         else
-            bdchns{subj_i,sess_i+1} = '0';
+            bdchns{subj_i,sess_i+1}  = '0';
         end
+        EEG.eventdescription         = { {'Too much noise in channels: '} badchannels };
 
         % Find and remove irrelevant triggers in EEG-recording periods
         trigarray = [];
@@ -555,11 +493,11 @@ for subj_i = 2:length(subj_list)
 
         % Save
         fprintf('\n****\nSave clean data subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        SaveName = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CLCleanEEG_inclBlinks.set'];
+        SaveName = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG.set'];
         EEG      = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
-        writematrix(rej_epocs,  [Path2EEGsets '/Overview_CLrejected_epochs_' char(datetime('today')) '.txt'], 'Delimiter',';');
-        writecell(ICAcomps,     [Path2EEGsets '/Overview_CLICAcomps_'        char(datetime('today')) '.txt'], 'Delimiter',';');
-        writecell(bdchns,       [Path2EEGsets '/Overview_CLnoisychannels_'   char(datetime('today')) '.txt'], 'Delimiter',';');
+        writematrix(rej_epocs,  [Path2EEGsets '/Overview_rejected_epochs_' char(datetime('today')) '.txt'], 'Delimiter',';');
+        writecell(ICAcomps,     [Path2EEGsets '/Overview_ICAcomps_'        char(datetime('today')) '.txt'], 'Delimiter',';');
+        writecell(bdchns,       [Path2EEGsets '/Overview_badchannels_'   char(datetime('today')) '.txt'], 'Delimiter',';');
 
         m2 = 0;
         while m2 == 0
