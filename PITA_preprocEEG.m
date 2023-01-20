@@ -499,12 +499,12 @@ for subj_i = 1:length(subj_list)
         writecell(ICAcomps,     [Path2EEGsets '/Overview_ICAcomps_'        char(datetime('today')) '.txt'], 'Delimiter',',');
         writecell(bdchns,       [Path2EEGsets '/Overview_badchannels_'     char(datetime('today')) '.txt'], 'Delimiter',',');
 
-        % Save also the EEG set with the noisy channels excluded:
-        EEG.data     = EEG.data(chanarray, :, :);
-        EEG.chanlocs = EEG.chanlocs(chanarray);
-        EEG.nbchan   = length(chanarray);
-        SaveName2    = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG_ExclBadchans.set'];
-        EEG          = pop_saveset( EEG, 'filename',SaveName2,'filepath', Path2EEGsets );
+%         % Save also the EEG set with the noisy channels excluded:
+%         EEG.data     = EEG.data(chanarray, :, :);
+%         EEG.chanlocs = EEG.chanlocs(chanarray);
+%         EEG.nbchan   = length(chanarray);
+%         SaveName2    = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG_ExclBadchans.set'];
+%         EEG          = pop_saveset( EEG, 'filename',SaveName2,'filepath', Path2EEGsets );
 
         m2 = 0;
         while m2 == 0
@@ -522,3 +522,5 @@ for subj_i = 1:length(subj_list)
 
     end
 end
+
+
