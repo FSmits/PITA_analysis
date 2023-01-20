@@ -352,11 +352,11 @@ bdchns(:,1)   = num2cell(subj_list');
 
 rej_epocs     = table2array( readtable( [Path2EEGsets '/Overview_rejected_epochs_'      char(datetime('today')) '.txt'] ) );
 ICAcomps      = table2cell(  readtable( [Path2EEGsets '/Overview_ICAcomps_' char(datetime('today')) '.txt'] ) );
-bdchns        = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_' char(datetime('today')) '.txt'] ) );
+bdchns        = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_' char(datetime('today')) '.txt'] ,'Format','auto') );
 % intrp_chans   = table2cell(  readtable( [Path2EEGsets '/Overview_interpolated_channels' char(datetime('today')) '.txt'] ) ); %char(datetime('yesterday')) '.txt'] ) ); %
 
 % Loop over files
-for subj_i = 5:length(subj_list)
+for subj_i = 1:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
@@ -452,11 +452,11 @@ for subj_i = 5:length(subj_list)
         EEG.reject.rejmanualE = zeros(length(EEG.chanlocs), EEG.trials);
 
         % Loop over channels and epochs
-        chanarray = 1:length(EEG.chanlocs)-2; % exclude last two channels (VEOG & HEOG)
+        chanarray = 1:length(EEG.chanlocs); 
         if length(noisychannels) > 0
             chanarray(noisychannels) = []; % remove the noisy channels from cleaning criteria
         end
-        for ichan = chanarray
+        for ichan = chanarray(1:end-2) % exclude last two channels (VEOG & HEOG)
             for itrial = 1:EEG.trials
                 gradient = max( abs( diff(EEG.data(ichan, :, itrial)) ) );
                 ampliMax = max(EEG.data(ichan, :, itrial));
@@ -495,9 +495,16 @@ for subj_i = 5:length(subj_list)
         fprintf('\n****\nSave clean data subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
         SaveName = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG.set'];
         EEG      = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
-        writematrix(rej_epocs,  [Path2EEGsets '/Overview_rejected_epochs_' char(datetime('today')) '.txt'], 'Delimiter',';');
-        writecell(ICAcomps,     [Path2EEGsets '/Overview_ICAcomps_'        char(datetime('today')) '.txt'], 'Delimiter',';');
-        writecell(bdchns,       [Path2EEGsets '/Overview_badchannels_'   char(datetime('today')) '.txt'], 'Delimiter',';');
+        writematrix(rej_epocs,  [Path2EEGsets '/Overview_rejected_epochs_' char(datetime('today')) '.txt'], 'Delimiter',',');
+        writecell(ICAcomps,     [Path2EEGsets '/Overview_ICAcomps_'        char(datetime('today')) '.txt'], 'Delimiter',',');
+        writecell(bdchns,       [Path2EEGsets '/Overview_badchannels_'     char(datetime('today')) '.txt'], 'Delimiter',',');
+
+        % Save also the EEG set with the noisy channels excluded:
+        EEG.data     = EEG.data(chanarray, :, :);
+        EEG.chanlocs = EEG.chanlocs(chanarray);
+        EEG.nbchan   = length(chanarray);
+        SaveName2    = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG_ExclBadchans.set'];
+        EEG          = pop_saveset( EEG, 'filename',SaveName2,'filepath', Path2EEGsets );
 
         m2 = 0;
         while m2 == 0
@@ -511,5 +518,7 @@ for subj_i = 5:length(subj_list)
 
         clear EEG
         ALLEEG(1:end) = [];
+        close all
+
     end
 end
