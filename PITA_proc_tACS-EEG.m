@@ -116,9 +116,15 @@ sess_i = 2
 
 
 
+         % Compute the laplacian 
+    EEG = pop_chanedit(EEG, 'lookup','H:\Myrte\eeglab2022.0\plugins\dipfit\standard_BESA\standard-10-5-cap385.elp');
+    
+    cd('H:\Myrte\Scripts, Functies & Output'); 
+    EEG.data = laplacian_perrinX(EEG.data,[EEG.chanlocs.X],[EEG.chanlocs.Y],[EEG.chanlocs.Z]);
+
         % ------ Do the FFT -------
 
-        
+
 
        % ----- Select only from channels with clean data, i.e. remove noisy channels from analysis outcome:
 

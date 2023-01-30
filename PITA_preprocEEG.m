@@ -440,66 +440,10 @@ for subj_i = 1:length(subj_list)
         % Remove baseline mean
         EEG = pop_rmbase( EEG, [0 50] ,[]); % 50 ms
 
-%         % Semi-automatic artifact rejection
-%         %     Gradient:  Specifies that the absolute difference between two adjacent sample points of data must not exceed a value (artifact of weird spikes). Starting values from Boost tutorial: Gradient: 75 μV
-%         %     Amplitude: Specifies that the voltage must not  exceed a certain value (artifacts like eye blinks). Starting values from Boost tutorial: Max-Min: 150 μV/200 ms
-%         %     Diff max-Min: Sets the threshold for the difference between the minimum and maximum voltages within the entire segment (voltage drifts). Starting values from Boost tutorial: Amplitude: -100 μV, +100 μV"
-%         ALLEEG  = EEG; CURRENTSET = 1; % Define ALLEEG and CURRENSET to enable trial rejection via pop_eegplot()
-%         winpnts = round(200/(1000/EEG.srate)); % points for window of 200 ms segments in the epoch
-%         winidx  = 1:winpnts:EEG.pnts; 
-%         windiff = nan(1,length(winidx));
-%         EEG.reject.rejmanual = zeros(1, EEG.trials); % Initialize the array for marked trials
-%         EEG.reject.rejmanualE = zeros(length(EEG.chanlocs), EEG.trials);
-%
-%         % Loop over channels and epochs
-%         chanarray = 1:length(EEG.chanlocs); 
-%         if length(noisychannels) > 0
-%             chanarray(noisychannels) = []; % remove the noisy channels from cleaning criteria
-%         end
-%         for ichan = chanarray(1:end-2) % exclude last two channels (VEOG & HEOG)
-%             for itrial = 1:EEG.trials
-%                 gradient = max( abs( diff(EEG.data(ichan, :, itrial)) ) );
-%                 ampliMax = max(EEG.data(ichan, :, itrial));
-%                 ampliMin = min(EEG.data(ichan, :, itrial));
-%                 for iwin = 1:length(winidx)-1
-%                     [winmin, winmax] = bounds(EEG.data( ichan, winidx(iwin):winidx(iwin)+winpnts-1, itrial));
-%                     windiff(iwin) = diff([winmin, winmax]);
-%                 end
-%                 diffV = max(windiff);
-% 
-%                 if gradient > 50 || ampliMax > 75 || ampliMin < -75 || diffV > 100  
-%                     EEG.reject.rejmanual(1,itrial) = 1; % Mark the trial when a criterium is met
-%                     EEG.reject.rejmanualE(ichan,itrial) = 1;
-%                 end
-%             end
-%         end
-% 
-%         % View the marked trials in plot
-%         %   Scale value to 80 and 25 epochs per window. Pay attention to VEOG.
-%         %   Reject the epoch around tACS artifact 
-%         rej_epocs(subj_i,1+sess_i) = EEG.trials; % Save total number of epochs
-%         find(EEG.reject.rejmanual > 0) % See the marked epoch numbers
-%         pop_eegplot( EEG, 1, 1, 0); % Plot data with marked epochs but do not immediately reject, only mark as noisy
-% 
-%         noisyepocs = find(EEG.reject.rejmanual > 0) %see and save final series of marked epochs
-%         EEG        = pop_rejepoch( EEG, noisyepocs ,0);
-%         [ALLEEG EEG CURRENTSET] = pop_newset(ALLEEG, EEG, 1,'savenew', [Path2EEGsets file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEGX.set'],'gui','off');
-%         
-%         m1 = -1 ;
-%         while m1 == -1
-%             m1 = input('How many epochs rejected?: ','s');
-%             while isempty(m1)
-%                 m1 = input('How many epochs rejected? [enter number]: ','s');
-%             end
-%         end
-%         rej_epocs(subj_i,3+sess_i) = str2double(m1);
-%         EEG.epochdescription         = [m1 '/' num2str(rej_epocs(subj_i,1+sess_i)) ' trials rejected'];
-
         % Save
         fprintf('\n****\nSave clean data subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
         SaveName = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG.set'];
         EEG      = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
-%        writematrix(rej_epocs,  [Path2EEGsets '/Overview_rejected_epochs_' char(datetime('today')) '.txt'], 'Delimiter',',');
         writecell(ICAcomps,     [Path2EEGsets '/Overview_ICAcomps_'        char(datetime('today')) '.txt'], 'Delimiter',',');
         writecell(bdchns,       [Path2EEGsets '/Overview_badchannels_'     char(datetime('today')) '.txt'], 'Delimiter',',');
 
@@ -524,11 +468,14 @@ end
 
 % initiate or load matrix to save no. of rejected epochs and rejected components per subject and interpolated and noisy channels:
 rej_epocs     = [subj_list'  nan(length(subj_list),length(sessions)*2)];
+
 ICAcomps      = table2cell(  readtable( [Path2EEGsets '/Overview_ICAcomps_20-Jan-2023.txt'] ) );
 bdchns        = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_20-Jan-2023.txt'] ,'Format','auto') );
 
+rej_epocs     = table2array( readtable( [Path2EEGsets '/Overview_rejected_epochs_' char(datetime('today')) '.txt'] ) );
+
 % Loop over files
-for subj_i = 1:length(subj_list)
+for subj_i = 31:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
@@ -536,6 +483,9 @@ for subj_i = 1:length(subj_list)
 
         % Load EEG set
         EEG      = pop_loadset('filename', fileName, 'filepath', Path2EEGsets);
+
+        [ALLEEG, EEG, CURRENTSET] = eeg_store( ALLEEG, EEG, 0 );
+        EEG = eeg_checkset( EEG );
 
         % Leave noisy channels (previously detected and saved) out of consideration for epoch rejection
         badchannels = bdchns{subj_i, sess_i+1};
@@ -553,7 +503,7 @@ for subj_i = 1:length(subj_list)
         %     Gradient:  Specifies that the absolute difference between two adjacent sample points of data must not exceed a value (artifact of weird spikes). Starting values from Boost tutorial: Gradient: 75 μV
         %     Amplitude: Specifies that the voltage must not  exceed a certain value (artifacts like eye blinks). Starting values from Boost tutorial: Max-Min: 150 μV/200 ms
         %     Diff max-Min: Sets the threshold for the difference between the minimum and maximum voltages within the entire segment (voltage drifts). Starting values from Boost tutorial: Amplitude: -100 μV, +100 μV"
-        ALLEEG  = EEG; CURRENTSET = 1; % Define ALLEEG and CURRENSET to enable trial rejection via pop_eegplot()
+ %       ALLEEG  = EEG; CURRENTSET = 1; % Define ALLEEG and CURRENSET to enable trial rejection via pop_eegplot()
         winpnts = round(200/(1000/EEG.srate)); % points for window of 200 ms segments in the epoch
         winidx  = 1:winpnts:EEG.pnts; 
         windiff = nan(1,length(winidx));
@@ -579,12 +529,16 @@ for subj_i = 1:length(subj_list)
             end
         end
 
+        [ALLEEG EEG CURRENTSET] = eeg_store(ALLEEG, EEG, CURRENTSET);
+
         % View the marked trials in plot
         %   Scale value to 80 and 25 epochs per window. Pay attention to VEOG.
         %   Reject the epoch around tACS artifact 
         rej_epocs(subj_i,1+sess_i) = EEG.trials; % Save total number of epochs
         find(EEG.reject.rejmanual > 0) % See the marked epoch numbers
+        EEG = eeg_checkset( EEG );
         pop_eegplot( EEG, 1, 1, 0); % Plot data with marked epochs but do not immediately reject, only mark as noisy
+
 
         m0 = -1;
         while m0 == -1
@@ -597,20 +551,18 @@ for subj_i = 1:length(subj_list)
         noisyepocs = find(EEG.reject.rejmanual > 0) % see & save final series of marked epochs
 
         m1 = [] ;
-        %         while m1 == -1
-        %             m1 = input('How many epochs rejected?: ','s');
         while isempty(m1)
             m1 = input('How many epochs rejected? [enter number]: ','s');
-            %                 epocs2brej = length(find(EEG.reject.rejmanual > 0));
-            %                 fprintf('\n**\nNo. epochs to reject: %i\n', epocs2brej);
         end
-%         end
-        rej_epocs(subj_i,3+sess_i) = str2double(m1);
-        EEG.epochdescription         = [m1 '/' num2str(rej_epocs(subj_i,1+sess_i)) ' trials rejected'];
 
-        EEG        = pop_rejepoch( EEG, noisyepocs ,0);
-        [ALLEEG EEG CURRENTSET] = pop_newset(ALLEEG, EEG, 1,'savenew', [Path2EEGsets file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEGX.set'],'gui','off');
-        
+        rej_epocs(subj_i,3+sess_i) = str2double(m1);
+        EEG.epochdescription       = [m1 '/' num2str(rej_epocs(subj_i,1+sess_i)) ' trials rejected'];
+        EEG                        = pop_rejepoch( EEG, noisyepocs , 1);
+        [ALLEEG EEG CURRENTSET]    = pop_newset(ALLEEG, EEG, CURRENTSET,'gui','off');
+        EEG = eeg_checkset( EEG );
+        [ALLEEG, EEG, CURRENTSET]  = eeg_store( ALLEEG, EEG );
+
+
         % Save
         fprintf('\n****\nSave clean data subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
         SaveName = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG_CleanEpochs.set'];
@@ -628,8 +580,13 @@ for subj_i = 1:length(subj_list)
         end
 
         clear EEG
-        ALLEEG(1:end) = [];
         close all
+
+        % open EEGlab
+        cd('/Users/fsmits2/Downloads/eeglab2022.1')
+        [ALLEEG, EEG, CURRENTSET, ALLCOM] = eeglab;
+
+        cd('/Users/fsmits2/Documents/PITA_analysis'); % return to PITA analysis folder
 
     end
 end
