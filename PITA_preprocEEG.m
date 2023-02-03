@@ -77,8 +77,8 @@ cd('/Users/fsmits2/Downloads/eeglab2022.1')
 cd('/Users/fsmits2/Documents/PITA_analysis'); % return to PITA analysis folder
 
 % set paths to data
-Path2EEGbdf  = '/Users/fsmits2/Downloads/1 EEG data tacs-eeg/';
-Path2EEGsets = '/Users/fsmits2/Downloads/1 EEG data tacs-eeg/3 EEG sets processed';
+Path2EEGbdf  = '/Users/fsmits2/Downloads/1 EEG data r-s/';
+Path2EEGsets = '/Users/fsmits2/Downloads/1 EEG data r-s/EEG data r-s processed';
 
 % enter subject names
 subj_list =[669	557 363	638	989	383	502	733	442	575	710	262 ...
@@ -101,6 +101,14 @@ file_type = {rec1, rec2, rec3, rec4, rec5};
 % Original trigger codes
 StartRec        = 254;
 StopRec         = 255;
+
+% resting-state EEG
+EyesOpenOnset    = 1;
+EyesOpenOffset   = 2;
+EyesClosedOnset  = 3;
+EyesClosedOffset = 4;
+
+% tACS-EEG
 start_tACS      = 5; %(2:20) identical to stop_EEG minus(1:19)
 stop_tACS       = 6; %(1:20) identical to start_EEG (1:20)
 start_EEG       = 7;
@@ -114,13 +122,14 @@ trig_base = repmat(0.01:0.01:0.30,[stims,1]);
 stim_mat  = repmat(1:stims,[secs,1])';
 trigs     = trig_base + stim_mat; % Trigger names are: #stimulation as integer, #second of data following that stimulation as decimal
 
+TriggerProblems = zeros(length(subj_list), length(sessions));
+
 % Loop over files
 for subj_i = 1:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nStart processing subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-
-        fileName = fullfile(Path2EEGbdf, [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '.bdf']);
+        fileName = fullfile(Path2EEGbdf, [file_type{1} num2str(subj_list(subj_i)) '-' num2str(sess_i) '.bdf']);
 
         % -- Load raw bdf data file via EEGlab
         EEG = pop_biosig( fileName );
@@ -145,80 +154,135 @@ for subj_i = 1:length(subj_list)
         trig_256 = find(strcmpi( {EEG.event.type}, '256' ));
         EEG = pop_editeventvals(EEG,'delete', trig_256);
 
-        % find or create trigger for tACS onset   (original code = '5'. Other possibile codes = '8' , ':Failing electrode' , ':breathing'.)
-        if any( subj_list(subj_i) == [638 275 262] )  &&  sess_i==1
-            EEG = pop_editeventvals(EEG,'insert',{1,[],[],[],[]},'changefield',{1,'type','5'},'changefield',{1,'edftype','5'},'changefield',{1,'latency',0.01});
-        end
-        tACS_begin = sort([find(strcmpi( {EEG.event.type}, '5' )), ...
-            find(strcmpi( {EEG.event.type}, '8' )),...
-            find(strcmpi( {EEG.event.type}, ':Failing electrode' )),...
-            find(strcmpi( {EEG.event.type}, ':breathing' )) ]);
 
-        % find trigger for tACS offset   (original code = '6'. Other possibile codes = '7' , ':sweat' , ':50/60 Hz mains interference'.)
-        tACS_end = sort([find(strcmpi( {EEG.event.type}, '6' )), ...
-            find(strcmpi( {EEG.event.type}, '7' )), ...
-            find(strcmpi( {EEG.event.type}, ':50/60 Hz mains interference' )), ...
-            find(strcmpi( {EEG.event.type}, ':sweat' )) ]);
-
-        % when too many trigger codes are found, select codes that show >90-second trigger-to-trigger delay (tACS_begin and tACS_end triggers are separated by ~92 seconds: 60 seconds stimulation + 30 second EEG recording period + 2 seconds ramp-up/ramp-down stimulation)
-        if length(tACS_begin) > 21
-            evlat90_begin = [];
-            evlat = [];
-            for eventi = 1:length(tACS_begin)
-                evlat(eventi) = EEG.event(tACS_begin(eventi)).latency / EEG.srate; %save event latencies in array
-            end
-            evlat90_begin  = find( diff(evlat) > 90) + 1; %find which events have a latency difference of >90 seconds
-            tACS_begin     = [tACS_begin(1) tACS_begin(evlat90_begin)];
-        end
-        if length(tACS_end) > 21
-            evlat90_end = [];
-            evlat = [];
-            for eventi = 1:length(tACS_end)
-                evlat(eventi) = EEG.event(tACS_end(eventi)).latency / EEG.srate; %save event latencies in array
-            end
-            evlat90_end  = find( diff(evlat) > 90) + 1; %find which events have a latency difference of >90 seconds
-            tACS_end     = [tACS_end(1) tACS_end(evlat90_end)];
+        %%% For resting-state data:
+        % Delete double events
+        if subj_list(subj_i)==710 && sess_i==1
+            EEG = pop_editeventvals(EEG,'delete', [3 11]);
+        elseif subj_list(subj_i)==752 && sess_i==1
+            EEG = pop_editeventvals(EEG,'delete', [6 8 13]);
+        elseif subj_list(subj_i)==752 && sess_i==2
+            EEG = pop_editeventvals(EEG,'delete', [1 2 3]);
+        elseif subj_list(subj_i)==600 && sess_i==2
+            EEG = pop_editeventvals(EEG,'delete', [5 9]);
+        elseif subj_list(subj_i)==923 && sess_i==2
+            EEG = pop_editeventvals(EEG,'delete', [4]);
+        elseif subj_list(subj_i)==508 && sess_i==2
+            EEG = pop_editeventvals(EEG,'delete', [3 6]);
+            EEG = pop_editeventvals(EEG,'insert',{ 4 ,[],[],[],[]},'changefield',{ 4 ,'type','3' }, 'changefield',{ 4 ,'edftype','3' }, 'changefield',{ 4 ,'latency', EEG.event(3).latency/EEG.srate+1 }); % latency of events (EEG.event.latency) is defined in data points, not in time. But when you want to change it, you need to define in seconds.
+        elseif subj_list(subj_i)==681 && sess_i==2
+            EEG = pop_editeventvals(EEG,'delete', [1 2 8 13]);
+        elseif subj_list(subj_i)==876 && sess_i==2
+            EEG = pop_editeventvals(EEG,'delete', [8 10]);
+        elseif subj_list(subj_i)==134 && sess_i==2
+            EEG = pop_editeventvals(EEG,'delete', [3]);
+        elseif subj_list(subj_i)==502 && sess_i==2
+            EEG = pop_editeventvals(EEG,'delete', [9]);
+            EEG = pop_editeventvals(EEG,'insert',{ 2 ,[],[],[],[]},'changefield',{ 2 ,'type','2' }, 'changefield',{ 2 ,'edftype','2' }, 'changefield',{ 2 ,'latency', EEG.event(3).latency/EEG.srate-1 }); % latency of events (EEG.event.latency) is defined in data points, not in time. But when you want to change it, you need to define in seconds.
         end
 
-        % re-code to original code for tACS onsets and offsets
-        for trig_i = 1:length(tACS_end)
-            EEG = pop_editeventvals(EEG,'changefield', {tACS_begin(trig_i) 'type' 'tACS_start'});
-            EEG = pop_editeventvals(EEG,'changefield', {tACS_end(trig_i)   'type' 'tACS_stop'});
-        end
+        % find or create trigger for resting-state onset  eyes-open & eyes-closed  (original codes = '1' / '3'. Other possibile codes = ':EOG (blinks, fast, large amplitude)' / ':EMG/Muscle'.)
+        open_begin  = sort([find(strcmpi( {EEG.event.type}, '1' )), ...
+            find(strcmpi( {EEG.event.type}, ':EOG (blinks, fast, large amplitude)' )) ]);
+        close_begin = sort([find(strcmpi( {EEG.event.type}, '3' )), ...
+            find(strcmpi( {EEG.event.type}, ':EMG/Muscle' )) ]);     
 
-        % insert time-related indices as event codes
-        bndrs     = find(strcmpi( {EEG.event.type}, 'tACS_stop' ));
-        bndrs_lat = [EEG.event(bndrs).latency];
-        % insert indexing trigger code every full second + little delay of 5 ms so that the indexing triggers do not overlap with 1-second epoch cuts
-        for i_EEGs = 1:length(bndrs)
-            for i_secs = 1:secs
-                EEG = pop_editeventvals(EEG, 'insert',{bndrs(i_EEGs)+i_secs,[],[],[],[]},...
-                    'changefield',{bndrs(i_EEGs)+i_secs ,'type',    trigs(i_EEGs,i_secs) },...
-                    'changefield',{bndrs(i_EEGs)+i_secs ,'edftype', trigs(i_EEGs,i_secs) },...
-                    'changefield',{bndrs(i_EEGs)+i_secs ,'latency', bndrs_lat(i_EEGs)/EEG.srate + i_secs}); % for latency event, latencies are in millisecond compared to the time locking event, not in data samples.
-            end
-        end
+        % find trigger for eyes-open & eyes-closed resting-state offset  (original code = '2' / '4'. Other possibile codes = ':ECG' / ':Movement'.)
+        open_end  = sort([find(strcmpi( {EEG.event.type}, '2' )), ...
+            find(strcmpi( {EEG.event.type}, ':ECG' )) ]);
+        close_end = sort([find(strcmpi( {EEG.event.type}, '4' )), ...
+            find(strcmpi( {EEG.event.type}, ':Movement' )) ]);
 
-        % -- Cut out data during stimulation (tACS)
-        tACS_begin = sort(find(strcmpi( {EEG.event.type}, 'tACS_start' )));
-        tACS_end   = sort(find(strcmpi( {EEG.event.type}, 'tACS_stop' )));
-        for ni = flip(1:length(tACS_begin))
-            EEG = eeg_eegrej(EEG, [EEG.event(tACS_begin(ni)).latency,  EEG.event(tACS_end(ni)).latency]); % remove data during tACS
-            [ALLEEG, EEG, CURRENTSET] = eeg_store(ALLEEG, EEG); % store changes
+        % re-code to original code for resting-state onsets and offsets
+        for trig_i = 1:length(open_begin)
+            EEG = pop_editeventvals(EEG,'changefield', {open_begin(trig_i)  'type' 'EyesOpenOnset'});
         end
+        for trig_i = 1:length(open_end)
+            EEG = pop_editeventvals(EEG,'changefield', {open_end(trig_i)    'type' 'EyesOpenOffset'});
+        end
+        for trig_i = 1:length(close_begin)
+            EEG = pop_editeventvals(EEG,'changefield', {close_begin(trig_i) 'type' 'EyesClosedOnset'});
+        end
+        for trig_i = 1:length(close_end)
+            EEG = pop_editeventvals(EEG,'changefield', {close_end(trig_i)   'type' 'EyesClosedOffset'});
+        end
+  
 
-        % -- Cut out data before first tACS-EEG & after last tACS-EEG period
-        EEG_begin = find(strcmpi( {EEG.event.type}, 'boundary' ));
-        EEG_end   = sort([find(strcmpi( {EEG.event.type}, '8' )), find(strcmpi( {EEG.event.type}, ':breathing' ))]);
-        EEG_end   = EEG_end(1,end); % in case multiple trigger codes '8' are available, pick last one
-        EEG       = eeg_eegrej(EEG, [EEG.event(EEG_end).latency + 0.05,   EEG.pnts(end)]);
-        EEG       = eeg_eegrej(EEG, [0,   EEG.event(EEG_begin(1)).latency - 0.05]);
+% % %         %%% For tACS-EEG data:
+% % %         % find or create trigger for tACS onset   (original code = '5'. Other possibile codes = '8' , ':Failing electrode' , ':breathing'.)
+% % %         if any( subj_list(subj_i) == [638 275 262] )  &&  sess_i==1
+% % %             EEG = pop_editeventvals(EEG,'insert',{1,[],[],[],[]},'changefield',{1,'type','5'},'changefield',{1,'edftype','5'},'changefield',{1,'latency',0.01});
+% % %         end
+% % %         tACS_begin = sort([find(strcmpi( {EEG.event.type}, '5' )), ...
+% % %             find(strcmpi( {EEG.event.type}, '8' )),...
+% % %             find(strcmpi( {EEG.event.type}, ':Failing electrode' )),...
+% % %             find(strcmpi( {EEG.event.type}, ':breathing' )) ]);
+% % % 
+% % %         % find trigger for tACS offset   (original code = '6'. Other possibile codes = '7' , ':sweat' , ':50/60 Hz mains interference'.)
+% % %         tACS_end = sort([find(strcmpi( {EEG.event.type}, '6' )), ...
+% % %             find(strcmpi( {EEG.event.type}, '7' )), ...
+% % %             find(strcmpi( {EEG.event.type}, ':50/60 Hz mains interference' )), ...
+% % %             find(strcmpi( {EEG.event.type}, ':sweat' )) ]);
+% % % 
+% % %         % when too many trigger codes are found, select codes that show >90-second trigger-to-trigger delay (tACS_begin and tACS_end triggers are separated by ~92 seconds: 60 seconds stimulation + 30 second EEG recording period + 2 seconds ramp-up/ramp-down stimulation)
+% % %         if length(tACS_begin) > 21
+% % %             evlat90_begin = [];
+% % %             evlat = [];
+% % %             for eventi = 1:length(tACS_begin)
+% % %                 evlat(eventi) = EEG.event(tACS_begin(eventi)).latency / EEG.srate; %save event latencies in array
+% % %             end
+% % %             evlat90_begin  = find( diff(evlat) > 90) + 1; %find which events have a latency difference of >90 seconds
+% % %             tACS_begin     = [tACS_begin(1) tACS_begin(evlat90_begin)];
+% % %         end
+% % %         if length(tACS_end) > 21
+% % %             evlat90_end = [];
+% % %             evlat = [];
+% % %             for eventi = 1:length(tACS_end)
+% % %                 evlat(eventi) = EEG.event(tACS_end(eventi)).latency / EEG.srate; %save event latencies in array
+% % %             end
+% % %             evlat90_end  = find( diff(evlat) > 90) + 1; %find which events have a latency difference of >90 seconds
+% % %             tACS_end     = [tACS_end(1) tACS_end(evlat90_end)];
+% % %         end
+% % % 
+% % %         % re-code to original code for tACS onsets and offsets
+% % %         for trig_i = 1:length(tACS_end)
+% % %             EEG = pop_editeventvals(EEG,'changefield', {tACS_begin(trig_i) 'type' 'tACS_start'});
+% % %             EEG = pop_editeventvals(EEG,'changefield', {tACS_end(trig_i)   'type' 'tACS_stop'});
+% % %         end
+% % % 
+% % %         % insert time-related indices as event codes
+% % %         bndrs     = find(strcmpi( {EEG.event.type}, 'tACS_stop' ));
+% % %         bndrs_lat = [EEG.event(bndrs).latency];
+% % %         % insert indexing trigger code every full second + little delay of 5 ms so that the indexing triggers do not overlap with 1-second epoch cuts
+% % %         for i_EEGs = 1:length(bndrs)
+% % %             for i_secs = 1:secs
+% % %                 EEG = pop_editeventvals(EEG, 'insert',{bndrs(i_EEGs)+i_secs,[],[],[],[]},...
+% % %                     'changefield',{bndrs(i_EEGs)+i_secs ,'type',    trigs(i_EEGs,i_secs) },...
+% % %                     'changefield',{bndrs(i_EEGs)+i_secs ,'edftype', trigs(i_EEGs,i_secs) },...
+% % %                     'changefield',{bndrs(i_EEGs)+i_secs ,'latency', bndrs_lat(i_EEGs)/EEG.srate + i_secs}); % for latency event, latencies are in millisecond compared to the time locking event, not in data samples.
+% % %             end
+% % %         end
+% % % 
+% % %         % -- Cut out data during stimulation (tACS)
+% % %         tACS_begin = sort(find(strcmpi( {EEG.event.type}, 'tACS_start' )));
+% % %         tACS_end   = sort(find(strcmpi( {EEG.event.type}, 'tACS_stop' )));
+% % %         for ni = flip(1:length(tACS_begin))
+% % %             EEG = eeg_eegrej(EEG, [EEG.event(tACS_begin(ni)).latency,  EEG.event(tACS_end(ni)).latency]); % remove data during tACS
+% % %             [ALLEEG, EEG, CURRENTSET] = eeg_store(ALLEEG, EEG); % store changes
+% % %         end
+% % % 
+% % %         % -- Cut out data before first tACS-EEG & after last tACS-EEG period
+% % %         EEG_begin = find(strcmpi( {EEG.event.type}, 'boundary' ));
+% % %         EEG_end   = sort([find(strcmpi( {EEG.event.type}, '8' )), find(strcmpi( {EEG.event.type}, ':breathing' ))]);
+% % %         EEG_end   = EEG_end(1,end); % in case multiple trigger codes '8' are available, pick last one
+% % %         EEG       = eeg_eegrej(EEG, [EEG.event(EEG_end).latency + 0.05,   EEG.pnts(end)]);
+% % %         EEG       = eeg_eegrej(EEG, [0,   EEG.event(EEG_begin(1)).latency - 0.05]);
 
         %         pop_eegplot( EEG, 1, 1, 1); % Inspect data
 
         % -- Save
         fprintf('\n****\nSave processed subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        SaveName = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_RawEEG.set'];
+        SaveName = [file_type{1} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_RawEEG.set'];
         EEG = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
 
         clear EEG
@@ -234,29 +298,29 @@ for subj_i = 1:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nStart pre-processing subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-
-        fileName = ['TACSEEG-' num2str(subj_list(subj_i)) '-' num2str(sess_i)];
+        fileName = [file_type{1} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_RawEEG.set'];
 
         % Load EEG set
-        EEG      = pop_loadset('filename', [fileName, '_RawEEG.set'], 'filepath', Path2EEGsets);
+        EEG      = pop_loadset('filename', fileName, 'filepath', Path2EEGsets);
 
-        % Check if all EEG-recording episodes are present
-        m0 = -1 ;
-        fprintf([ num2str(subj_list(subj_i)) ' session ' num2str(sessions(sess_i)) ' -- Number of events: ' num2str(length(EEG.event)) ' \n '])
-        while m0 == -1
-            if length(EEG.event) < 600
-                m0 = input('Continue? Y/N: ','s');
-                if m0 == 'Y'
-                    continue
-                else 
-                    m0 = 0;
-                    return
-                end
-            else
-                m0 = 0;
-                continue
-            end
-        end
+% % %         %%% For tACS-EEG
+% % %         % Check if all EEG-recording episodes are present
+% % %         m0 = -1 ;
+% % %         fprintf([ num2str(subj_list(subj_i)) ' session ' num2str(sessions(sess_i)) ' -- Number of events: ' num2str(length(EEG.event)) ' \n '])
+% % %         while m0 == -1
+% % %             if length(EEG.event) < 600
+% % %                 m0 = input('Continue? Y/N: ','s');
+% % %                 if m0 == 'Y'
+% % %                     continue
+% % %                 else 
+% % %                     m0 = 0;
+% % %                     return
+% % %                 end
+% % %             else
+% % %                 m0 = 0;
+% % %                 continue
+% % %             end
+% % %         end
 
         % Re-reference to avg mastoids
         mastoid1 = find(strcmpi( {EEG.chanlocs.labels}, 'EXG5' ));
@@ -284,7 +348,7 @@ for subj_i = 1:length(subj_list)
 
         % Save
         fprintf('\n****\nSave pre-processed subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        SaveName = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_PreprocEEG.set'];
+        SaveName = [file_type{1} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_PreprocEEG.set'];
         EEG = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
 
         clear EEG
@@ -319,17 +383,17 @@ for subj_i = 1:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        fileName = ['TACSEEG-' num2str(subj_list(subj_i)) '-' num2str(sess_i)];
+        fileName = [file_type{1} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_PreprocEEG.set'];
 
         % Load EEG set
-        EEG      = pop_loadset('filename', [fileName, '_PreprocEEG.set'], 'filepath', Path2EEGsets);
+        EEG      = pop_loadset('filename', fileName, 'filepath', Path2EEGsets);
 
         % Find Eyeblink components with ICA (runica):
         EEG = pop_runica(EEG, 'icatype', 'runica', 'extended',1,'interrupt','on');
 
         % Save
         fprintf('\n****\nSave ICA data subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        SaveName = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_Preproc_ICAfull.set'];
+        SaveName = [file_type{1} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_Preproc_ICAfull.set'];
         EEG      = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
           
         clear EEG
@@ -339,16 +403,107 @@ for subj_i = 1:length(subj_list)
 end
 
 
+%% [resting-state only] Epoch the data
+
+for subj_i = 1:length(subj_list)
+    for sess_i = 1:length(sessions)
+
+        fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
+        fileName = [file_type{1} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_Preproc_ICAfull.set'];
+
+        % Load EEG set
+        EEG      = pop_loadset('filename', fileName , 'filepath', Path2EEGsets);
+
+        % Check (& fix) if enough and the right triggers are present
+        if subj_list(subj_i)==502 && sess_i == 2
+            EEG = pop_editeventvals(EEG,'delete', length(EEG.event)-1);
+            EEG = pop_editeventvals(EEG,'insert',{ length(EEG.event)-1 ,[],[],[],[]}, 'changefield',{ length(EEG.event)-1 ,'type','EyesClosedOffset' },  'changefield',{ length(EEG.event)-1 ,'edftype','EyesClosedOffset' }, 'changefield',{ length(EEG.event)-1 ,'latency', EEG.event(end).latency/EEG.srate-1 }); % latency of events (EEG.event.latency) is defined in data points, not in time. But when you want to change it, you need to define in seconds.
+        elseif (subj_list(subj_i)==227 || subj_list(subj_i)==565) && sess_i == 2
+            EEG = pop_editeventvals(EEG,'insert',{ 1 ,[],[],[],[]}, 'changefield',{ 1 ,'type','EyesOpenOnset' },  'changefield',{ 1 ,'edftype','EyesOpenOnset' }, 'changefield',{ 1 ,'latency', (EEG.times(1)/1000)+1 });
+        elseif subj_list(subj_i)==915 && sess_i == 2
+            EEG = pop_editeventvals(EEG,'insert',{ length(EEG.event) ,[],[],[],[]}, 'changefield',{ length(EEG.event) ,'type','EyesClosedOffset' },  'changefield',{ length(EEG.event) ,'edftype','EyesClosedOffset' }, 'changefield',{ length(EEG.event) ,'latency',  (EEG.times(end)/1000)-1 });
+        elseif subj_list(subj_i)==202 && sess_i == 2
+            trig_20s = [find(strcmpi( {EEG.event.type}, '20' )) find(strcmpi( {EEG.event.type}, '21' )) find(strcmpi( {EEG.event.type}, '22' )) find(strcmpi( {EEG.event.type}, '23' )) find(strcmpi( {EEG.event.type}, '20' ))];
+        EEG = pop_editeventvals(EEG,'delete', trig_20s);
+        end
+        open_begin  = sort(find(strcmpi( {EEG.event.type}, 'EyesOpenOnset' ))); %Find the open/closed eyes onset/offset triggers
+        close_end   = sort(find(strcmpi( {EEG.event.type}, 'EyesClosedOffset' )));
+        if length(open_begin) ~= 2 || length(close_end) ~= 2
+            if subj_list(subj_i)~=383 && sess_i~=1
+                fprintf('\n****\nNot enough trigger codes in subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
+                return
+            end
+        end
+
+        % To enter trigger after each second in continuous data, first find timings in data
+        ntrg   = [open_begin  close_end];
+        for trgi = 1:length(ntrg)
+            open_begin  = sort(find(strcmpi( {EEG.event.type}, 'EyesOpenOnset' ))); %Find the open/closed eyes onset/offset triggers
+            open_end    = sort(find(strcmpi( {EEG.event.type}, 'EyesOpenOffset' )));
+            close_begin = sort(find(strcmpi( {EEG.event.type}, 'EyesClosedOnset' )));
+            close_end   = sort(find(strcmpi( {EEG.event.type}, 'EyesClosedOffset' )));
+            trgT0   = [open_begin  close_begin];
+            trgTend = [open_end    close_end  ];
+            T0   = EEG.event(trgT0(  trgi)).latency;
+            if subj_list(subj_i)==383 && sess_i==1
+                if trgi==2
+                    Tend = (EEG.times(end)/1000)*256;
+                elseif trgi==3
+                    Tend = EEG.event(trgTend(2)).latency;
+                else
+                    Tend = EEG.event(trgTend(trgi)).latency;
+                end
+            elseif subj_list(subj_i)==710 && sess_i==1 && trgi==4
+                Tend = (EEG.times(end)/1000)*EEG.srate;
+            else
+                Tend = EEG.event(trgTend(trgi)).latency;
+            end
+            % Create triggers each second (1-sec segments) minus the final second (because no full second left):
+            trggLats = T0:EEG.srate:Tend-1*EEG.srate;
+            for segi = 1:length(trggLats)
+                if ismember(trgT0(trgi),open_begin)
+                    trgcode = '11';
+                elseif ismember(trgT0(trgi),close_begin)
+                    trgcode = '22';
+                else
+                    fprintf('\n****\nNot able to match trigger codes in subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
+                    return
+                end
+                EEG = pop_editeventvals(EEG,'insert',{ segi ,[],[],[],[]},...
+                    'changefield',{ segi ,'type',    trgcode },...
+                    'changefield',{ segi ,'edftype', trgcode },...
+                    'changefield',{ segi ,'latency', trggLats(segi)/256 }); % latency of events (EEG.event.latency) is defined in data points, not in time. But when you want to change it, you need to define in seconds.
+            end
+        end
+
+        % Divide into 1-sec epochs
+        EEG = pop_epoch( EEG, {'11' '22'},  [0  1], 'epochinfo', 'yes');
+        % Remove baseline mean
+        EEG = pop_rmbase( EEG, [0 50] ,[]); % 50 ms
+
+        fprintf('\n****\nSave epoched data subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
+        SaveName = [file_type{1} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_Preproc_ICAfull_epoched.set'];
+        EEG      = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
+
+        clear EEG
+        ALLEEG(1:end) = [];
+
+    end
+end
+
+
+
+
 %% Clean the data
 
 % initiate or load matrix to save no. of rejected epochs and rejected components per subject and interpolated and noisy channels:
 rej_epocs     = [subj_list'  nan(length(subj_list),length(sessions)*2)];
 ICAcomps      = cell(length(subj_list),3);
 ICAcomps(:,1) = num2cell(subj_list');
-% intrp_chans      = cell(length(subj_list),3);
-% intrp_chans(:,1) = num2cell(subj_list');
 bdchns        = cell(length(subj_list),3);
 bdchns(:,1)   = num2cell(subj_list');
+% intrp_chans      = cell(length(subj_list),3);
+% intrp_chans(:,1) = num2cell(subj_list');
 
 rej_epocs     = table2array( readtable( [Path2EEGsets '/Overview_rejected_epochs_'      char(datetime('today')) '.txt'] ) );
 ICAcomps      = table2cell(  readtable( [Path2EEGsets '/Overview_ICAcomps_' char(datetime('today')) '.txt'] ) );
@@ -356,14 +511,14 @@ bdchns        = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_' c
 % intrp_chans   = table2cell(  readtable( [Path2EEGsets '/Overview_interpolated_channels' char(datetime('today')) '.txt'] ) ); %char(datetime('yesterday')) '.txt'] ) ); %
 
 % Loop over files
-for subj_i = 1:length(subj_list)
+for subj_i = 7:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        fileName = ['TACSEEG-' num2str(subj_list(subj_i)) '-' num2str(sess_i)];
+        fileName = [file_type{1} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_Preproc_ICAfull_epoched.set'];
 
         % Load EEG set
-        EEG      = pop_loadset('filename', [fileName, '_Preproc_ICAfull.set'], 'filepath', Path2EEGsets);
+        EEG      = pop_loadset('filename', fileName , 'filepath', Path2EEGsets);
 
         % Remove ICA components
         ALLEEG = EEG;
@@ -392,7 +547,7 @@ for subj_i = 1:length(subj_list)
             ICAcomps{subj_i,sess_i+1} = comp;
             EEG = pop_subcomp( EEG, comp , 0);
         end
-        
+
         % Find channels with high standard deviation to detect noisy channels
         pop_eegplot( EEG, 1, 1, 1);
         chansd     = std(EEG.data(1:30, :)');
@@ -425,67 +580,6 @@ for subj_i = 1:length(subj_list)
             bdchns{subj_i,sess_i+1}  = '0';
         end
         EEG.eventdescription         = { {'Too much noise in channels: '} badchannels };
-
-        % Find and remove irrelevant triggers in EEG-recording periods
-        trigarray = [];
-        for eventi = 1:length(EEG.event)
-            trigarray(eventi) = str2double(EEG.event(eventi).type);
-        end
-        rejects_char = find( isnan( trigarray) );
-        rejects_num  = find( trigarray == 8 | trigarray == 7 | trigarray == 6 | trigarray == 5 );
-        trigarray( [rejects_char rejects_num] ) = [];
-
-        % Divide into 1-sec epochs
-        EEG = pop_epoch( EEG, num2cell(trigarray),  [0  1], 'epochinfo', 'yes');
-        % Remove baseline mean
-        EEG = pop_rmbase( EEG, [0 50] ,[]); % 50 ms
-
-        % Save
-        fprintf('\n****\nSave clean data subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        SaveName = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG.set'];
-        EEG      = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
-        writecell(ICAcomps,     [Path2EEGsets '/Overview_ICAcomps_'        char(datetime('today')) '.txt'], 'Delimiter',',');
-        writecell(bdchns,       [Path2EEGsets '/Overview_badchannels_'     char(datetime('today')) '.txt'], 'Delimiter',',');
-
-        m2 = 0;
-        while m2 == 0
-            m2 = input('Continue? [Y/N] ','s');
-            if m2 == 'Y'
-                continue
-            else
-                return
-            end
-        end
-
-        clear EEG
-        ALLEEG(1:end) = [];
-        close all
-
-    end
-end
-
-%% Re-do cleaning for correctly rejecting epocs and saving set with clean epochs only
-
-% initiate or load matrix to save no. of rejected epochs and rejected components per subject and interpolated and noisy channels:
-rej_epocs     = [subj_list'  nan(length(subj_list),length(sessions)*2)];
-
-ICAcomps      = table2cell(  readtable( [Path2EEGsets '/Overview_ICAcomps_20-Jan-2023.txt'] ) );
-bdchns        = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_20-Jan-2023.txt'] ,'Format','auto') );
-
-rej_epocs     = table2array( readtable( [Path2EEGsets '/Overview_rejected_epochs_' char(datetime('today')) '.txt'] ) );
-
-% Loop over files
-for subj_i = 31:length(subj_list)
-    for sess_i = 1:length(sessions)
-
-        fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        fileName = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG.set'];
-
-        % Load EEG set
-        EEG      = pop_loadset('filename', fileName, 'filepath', Path2EEGsets);
-
-        [ALLEEG, EEG, CURRENTSET] = eeg_store( ALLEEG, EEG, 0 );
-        EEG = eeg_checkset( EEG );
 
         % Leave noisy channels (previously detected and saved) out of consideration for epoch rejection
         badchannels = bdchns{subj_i, sess_i+1};
@@ -529,16 +623,13 @@ for subj_i = 31:length(subj_list)
             end
         end
 
-        [ALLEEG EEG CURRENTSET] = eeg_store(ALLEEG, EEG, CURRENTSET);
-
         % View the marked trials in plot
-        %   Scale value to 80 and 25 epochs per window. Pay attention to VEOG.
+        %   Scale value to 100 and 29 epochs per window. Pay attention to VEOG.
         %   Reject the epoch around tACS artifact 
         rej_epocs(subj_i,1+sess_i) = EEG.trials; % Save total number of epochs
         find(EEG.reject.rejmanual > 0) % See the marked epoch numbers
         EEG = eeg_checkset( EEG );
         pop_eegplot( EEG, 1, 1, 0); % Plot data with marked epochs but do not immediately reject, only mark as noisy
-
 
         m0 = -1;
         while m0 == -1
@@ -549,6 +640,7 @@ for subj_i = 31:length(subj_list)
         end
 
         noisyepocs = find(EEG.reject.rejmanual > 0) % see & save final series of marked epochs
+        length(noisyepocs)
 
         m1 = [] ;
         while isempty(m1)
@@ -561,6 +653,155 @@ for subj_i = 31:length(subj_list)
         [ALLEEG EEG CURRENTSET]    = pop_newset(ALLEEG, EEG, CURRENTSET,'gui','off');
         EEG = eeg_checkset( EEG );
         [ALLEEG, EEG, CURRENTSET]  = eeg_store( ALLEEG, EEG );
+
+        % Save
+        fprintf('\n****\nSave clean data subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
+        SaveName = [file_type{1} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG.set'];
+        EEG      = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
+        writecell(ICAcomps,     [Path2EEGsets '/Overview_ICAcomps_'        char(datetime('today')) '.txt'], 'Delimiter',',');
+        writecell(bdchns,       [Path2EEGsets '/Overview_badchannels_'     char(datetime('today')) '.txt'], 'Delimiter',',');
+
+        m2 = 0;
+        while m2 == 0
+            m2 = input('Continue? [Y/N] ','s');
+            if m2 == 'Y'
+                continue
+            else
+                return
+            end
+        end
+
+        clear EEG
+        close all
+
+        % open EEGlab
+        cd('/Users/fsmits2/Downloads/eeglab2022.1')
+        [ALLEEG, EEG, CURRENTSET, ALLCOM] = eeglab;
+
+        cd('/Users/fsmits2/Documents/PITA_analysis'); % return to PITA analysis folder
+
+    end
+end
+
+
+
+
+
+        fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
+        fileName = [file_type{1} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG.set'];
+
+        % Load EEG set
+        EEG      = pop_loadset('filename', fileName , 'filepath', Path2EEGsets);
+
+
+
+
+
+
+
+
+
+
+
+
+
+%% Re-do cleaning for correctly rejecting epocs and saving set with clean epochs only
+
+% initiate or load matrix to save no. of rejected epochs and rejected components per subject and interpolated and noisy channels:
+rej_epocs     = [subj_list'  nan(length(subj_list),length(sessions)*2)];
+
+ICAcomps      = table2cell(  readtable( [Path2EEGsets '/Overview_ICAcomps_20-Jan-2023.txt'] ) );
+bdchns        = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_20-Jan-2023.txt'] ,'Format','auto') );
+
+rej_epocs     = table2array( readtable( [Path2EEGsets '/Overview_rejected_epochs_' char(datetime('today')) '.txt'] ) );
+
+% Loop over files
+for subj_i = 31:length(subj_list)
+    for sess_i = 1:length(sessions)
+
+        fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
+        fileName = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG.set'];
+
+        % Load EEG set
+        EEG      = pop_loadset('filename', fileName, 'filepath', Path2EEGsets);
+
+        [ALLEEG, EEG, CURRENTSET] = eeg_store( ALLEEG, EEG, 0 );
+        EEG = eeg_checkset( EEG );
+
+%         % Leave noisy channels (previously detected and saved) out of consideration for epoch rejection
+%         badchannels = bdchns{subj_i, sess_i+1};
+%         chanarray   = 1:length(EEG.chanlocs)-2; %minus last two channels (EMG chans: HEOG, VEOG)
+%         if sum( strcmpi( badchannels, '0') ) < 1
+%             badchans = regexp(badchannels, ',', 'split');
+%             noisychannels = [];
+%             for bchni = 1:length(badchans)
+%                 noisychannels(bchni) = find( strcmpi( badchans{bchni}, {EEG.chanlocs.labels} ));
+%             end
+%             chanarray(noisychannels) = []; % remove the noisy channels from chanarray
+%         end
+% 
+%         % Semi-automatic artifact rejection
+%         %     Gradient:  Specifies that the absolute difference between two adjacent sample points of data must not exceed a value (artifact of weird spikes). Starting values from Boost tutorial: Gradient: 75 μV
+%         %     Amplitude: Specifies that the voltage must not  exceed a certain value (artifacts like eye blinks). Starting values from Boost tutorial: Max-Min: 150 μV/200 ms
+%         %     Diff max-Min: Sets the threshold for the difference between the minimum and maximum voltages within the entire segment (voltage drifts). Starting values from Boost tutorial: Amplitude: -100 μV, +100 μV"
+%  %       ALLEEG  = EEG; CURRENTSET = 1; % Define ALLEEG and CURRENSET to enable trial rejection via pop_eegplot()
+%         winpnts = round(200/(1000/EEG.srate)); % points for window of 200 ms segments in the epoch
+%         winidx  = 1:winpnts:EEG.pnts; 
+%         windiff = nan(1,length(winidx));
+%         EEG.reject.rejmanual = zeros(1, EEG.trials); % Initialize the array for marked trials
+%         EEG.reject.rejmanualE = zeros(length(EEG.chanlocs), EEG.trials);
+% 
+%         % Loop over channels and epochs
+%         for ichan = chanarray(1:end-2) % exclude last two channels (VEOG & HEOG)
+%             for itrial = 1:EEG.trials
+%                 gradient = max( abs( diff(EEG.data(ichan, :, itrial)) ) );
+%                 ampliMax = max(EEG.data(ichan, :, itrial));
+%                 ampliMin = min(EEG.data(ichan, :, itrial));
+%                 for iwin = 1:length(winidx)-1
+%                     [winmin, winmax] = bounds(EEG.data( ichan, winidx(iwin):winidx(iwin)+winpnts-1, itrial));
+%                     windiff(iwin) = diff([winmin, winmax]);
+%                 end
+%                 diffV = max(windiff);
+% 
+%                 if gradient > 50 || ampliMax > 75 || ampliMin < -75 || diffV > 100  
+%                     EEG.reject.rejmanual(1,itrial) = 1; % Mark the trial when a criterium is met
+%                     EEG.reject.rejmanualE(ichan,itrial) = 1;
+%                 end
+%             end
+%         end
+% 
+%         [ALLEEG EEG CURRENTSET] = eeg_store(ALLEEG, EEG, CURRENTSET);
+% 
+%         % View the marked trials in plot
+%         %   Scale value to 100 and 29 epochs per window. Pay attention to VEOG.
+%         %   Reject the epoch around tACS artifact 
+%         rej_epocs(subj_i,1+sess_i) = EEG.trials; % Save total number of epochs
+%         find(EEG.reject.rejmanual > 0) % See the marked epoch numbers
+%         EEG = eeg_checkset( EEG );
+%         pop_eegplot( EEG, 1, 1, 0); % Plot data with marked epochs but do not immediately reject, only mark as noisy
+% 
+% 
+%         m0 = -1;
+%         while m0 == -1
+%             m0 = input('Ready to reject epocs? ','s');
+%             while isempty(m0)
+%                 m0 = input('Ready to reject epocs? [yes]: ','s');
+%             end
+%         end
+% 
+%         noisyepocs = find(EEG.reject.rejmanual > 0) % see & save final series of marked epochs
+% 
+%         m1 = [] ;
+%         while isempty(m1)
+%             m1 = input('How many epochs rejected? [enter number]: ','s');
+%         end
+% 
+%         rej_epocs(subj_i,3+sess_i) = str2double(m1);
+%         EEG.epochdescription       = [m1 '/' num2str(rej_epocs(subj_i,1+sess_i)) ' trials rejected'];
+%         EEG                        = pop_rejepoch( EEG, noisyepocs , 1);
+%         [ALLEEG EEG CURRENTSET]    = pop_newset(ALLEEG, EEG, CURRENTSET,'gui','off');
+%         EEG = eeg_checkset( EEG );
+%         [ALLEEG, EEG, CURRENTSET]  = eeg_store( ALLEEG, EEG );
 
 
         % Save
