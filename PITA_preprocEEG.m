@@ -77,8 +77,8 @@ cd('/Users/fsmits2/Downloads/eeglab2022.1')
 cd('/Users/fsmits2/Documents/PITA_analysis'); % return to PITA analysis folder
 
 % set paths to data
-Path2EEGbdf  = '/Users/fsmits2/Downloads/1 EEG data r-s/';
-Path2EEGsets = '/Users/fsmits2/Downloads/1 EEG data r-s/EEG data r-s processed';
+Path2EEGbdf  = '/Users/fsmits2/Downloads/1 EEG data tacs-eeg/';
+Path2EEGsets = '/Users/fsmits2/Downloads/1 EEG data tacs-eeg/post-tacs r-s processed';
 
 % enter subject names
 subj_list =[669	557 363	638	989	383	502	733	442	575	710	262 ...
@@ -124,12 +124,15 @@ trigs     = trig_base + stim_mat; % Trigger names are: #stimulation as integer, 
 
 TriggerProblems = zeros(length(subj_list), length(sessions));
 
+% Which task (file type) you want to analyze?
+typeno = 4;
+
 % Loop over files
 for subj_i = 1:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nStart processing subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        fileName = fullfile(Path2EEGbdf, [file_type{1} num2str(subj_list(subj_i)) '-' num2str(sess_i) '.bdf']);
+        fileName = fullfile(Path2EEGbdf, [file_type{typeno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '.bdf']);
 
         % -- Load raw bdf data file via EEGlab
         EEG = pop_biosig( fileName );
@@ -282,7 +285,7 @@ for subj_i = 1:length(subj_list)
 
         % -- Save
         fprintf('\n****\nSave processed subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        SaveName = [file_type{1} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_RawEEG.set'];
+        SaveName = [file_type{typeno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_RawEEG.set'];
         EEG = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
 
         clear EEG
@@ -294,11 +297,13 @@ end
 
 %% Pre-processing steps: re-reference, downsample, filter, create bipolar EOG channels
 
+fileno = 4;
+
 for subj_i = 1:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nStart pre-processing subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        fileName = [file_type{1} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_RawEEG.set'];
+        fileName = [file_type{fileno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_RawEEG.set'];
 
         % Load EEG set
         EEG      = pop_loadset('filename', fileName, 'filepath', Path2EEGsets);
@@ -348,7 +353,7 @@ for subj_i = 1:length(subj_list)
 
         % Save
         fprintf('\n****\nSave pre-processed subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        SaveName = [file_type{1} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_PreprocEEG.set'];
+        SaveName = [file_type{fileno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_PreprocEEG.set'];
         EEG = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
 
         clear EEG
@@ -378,12 +383,14 @@ end
 
 %% ICA
 
+fileno = 4;
+
 % Loop over files
 for subj_i = 1:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        fileName = [file_type{1} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_PreprocEEG.set'];
+        fileName = [file_type{fileno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_PreprocEEG.set'];
 
         % Load EEG set
         EEG      = pop_loadset('filename', fileName, 'filepath', Path2EEGsets);
@@ -393,7 +400,7 @@ for subj_i = 1:length(subj_list)
 
         % Save
         fprintf('\n****\nSave ICA data subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        SaveName = [file_type{1} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_Preproc_ICAfull.set'];
+        SaveName = [file_type{fileno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_Preproc_ICAfull.set'];
         EEG      = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
           
         clear EEG
@@ -405,11 +412,13 @@ end
 
 %% [resting-state only] Epoch the data
 
+fileno = 2;
+
 for subj_i = 1:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        fileName = [file_type{1} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_Preproc_ICAfull.set'];
+        fileName = [file_type{fileno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_Preproc_ICAfull.set'];
 
         % Load EEG set
         EEG      = pop_loadset('filename', fileName , 'filepath', Path2EEGsets);
@@ -482,7 +491,7 @@ for subj_i = 1:length(subj_list)
         EEG = pop_rmbase( EEG, [0 50] ,[]); % 50 ms
 
         fprintf('\n****\nSave epoched data subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        SaveName = [file_type{1} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_Preproc_ICAfull_epoched.set'];
+        SaveName = [file_type{fileno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_Preproc_ICAfull_epoched.set'];
         EEG      = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
 
         clear EEG
@@ -510,12 +519,14 @@ ICAcomps      = table2cell(  readtable( [Path2EEGsets '/Overview_ICAcomps_' char
 bdchns        = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_' char(datetime('today')) '.txt'] ,'Format','auto') );
 % intrp_chans   = table2cell(  readtable( [Path2EEGsets '/Overview_interpolated_channels' char(datetime('today')) '.txt'] ) ); %char(datetime('yesterday')) '.txt'] ) ); %
 
+fileno = 4;
+
 % Loop over files
-for subj_i = 7:length(subj_list)
+for subj_i = 36:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        fileName = [file_type{1} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_Preproc_ICAfull_epoched.set'];
+        fileName = [file_type{fileno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_Preproc_ICAfull_epoched.set'];
 
         % Load EEG set
         EEG      = pop_loadset('filename', fileName , 'filepath', Path2EEGsets);
@@ -656,10 +667,11 @@ for subj_i = 7:length(subj_list)
 
         % Save
         fprintf('\n****\nSave clean data subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        SaveName = [file_type{1} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG.set'];
+        SaveName = [file_type{fileno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG.set'];
         EEG      = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
         writecell(ICAcomps,     [Path2EEGsets '/Overview_ICAcomps_'        char(datetime('today')) '.txt'], 'Delimiter',',');
         writecell(bdchns,       [Path2EEGsets '/Overview_badchannels_'     char(datetime('today')) '.txt'], 'Delimiter',',');
+        writematrix(rej_epocs,  [Path2EEGsets '/Overview_rejected_epochs_' char(datetime('today')) '.txt'], 'Delimiter',',');
 
         m2 = 0;
         while m2 == 0
@@ -688,15 +700,28 @@ end
 
 
         fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        fileName = [file_type{1} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG.set'];
+        fileName = [file_type{fileno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG.set'];
 
         % Load EEG set
         EEG      = pop_loadset('filename', fileName , 'filepath', Path2EEGsets);
 
-
-
-
-
+        % Reverse eyes-open eyes-closed codes for subj 262 session 1
+        if subj_list(subj_i)==262 && sess_i==1
+            for trigi = 1:length(EEG.event)
+                if EEG.event(trigi).type=='11'
+                    EEG = pop_editeventvals(EEG,'changefield', {trigi 'type' '0'});
+                elseif EEG.event(trigi).type=='22'
+                    EEG = pop_editeventvals(EEG,'changefield', {trigi 'type' '11'});
+                end
+            end
+            for trigi = 1:length(EEG.event)
+                if EEG.event(trigi).type=='0'
+                    EEG = pop_editeventvals(EEG,'changefield', {trigi 'type' '22'});
+                else
+                    continue
+                end
+            end
+        end
 
 
 
@@ -715,12 +740,14 @@ bdchns        = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_20-
 
 rej_epocs     = table2array( readtable( [Path2EEGsets '/Overview_rejected_epochs_' char(datetime('today')) '.txt'] ) );
 
+fileno = 4;
+
 % Loop over files
 for subj_i = 31:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        fileName = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG.set'];
+        fileName = [file_type{fileno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG.set'];
 
         % Load EEG set
         EEG      = pop_loadset('filename', fileName, 'filepath', Path2EEGsets);
@@ -806,7 +833,7 @@ for subj_i = 31:length(subj_list)
 
         % Save
         fprintf('\n****\nSave clean data subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        SaveName = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG_CleanEpochs.set'];
+        SaveName = [file_type{fileno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG_CleanEpochs.set'];
         EEG      = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
         writematrix(rej_epocs,  [Path2EEGsets '/Overview_rejected_epochs_' char(datetime('today')) '.txt'], 'Delimiter',',');
        
