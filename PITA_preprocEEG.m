@@ -115,24 +115,23 @@ start_EEG       = 7;
 stop_EEG        = 8;
 post_tACS_EEG   = 9;
 
-% Initiate time/period-related triggers
-secs      = 30; % 30 seconden data na elke tACS stimulatie
-stims     = 20; % 20 tACS stimulaties in totaal
-trig_base = repmat(0.01:0.01:0.30,[stims,1]);
-stim_mat  = repmat(1:stims,[secs,1])';
-trigs     = trig_base + stim_mat; % Trigger names are: #stimulation as integer, #second of data following that stimulation as decimal
-
-TriggerProblems = zeros(length(subj_list), length(sessions));
+% %%% For tACS-EEG data:
+% % Initiate time/period-related triggers
+% secs      = 30; % 30 seconden data na elke tACS stimulatie
+% stims     = 20; % 20 tACS stimulaties in totaal
+% trig_base = repmat(0.01:0.01:0.30,[stims,1]);
+% stim_mat  = repmat(1:stims,[secs,1])';
+% trigs     = trig_base + stim_mat; % Trigger names are: #stimulation as integer, #second of data following that stimulation as decimal
 
 % Which task (file type) you want to analyze?
-typeno = 4;
+fileno = 3;
 
 % Loop over files
-for subj_i = 1:length(subj_list)
+for subj_i = 31:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nStart processing subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        fileName = fullfile(Path2EEGbdf, [file_type{typeno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '.bdf']);
+        fileName = fullfile(Path2EEGbdf, [file_type{fileno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '.bdf']);
 
         % -- Load raw bdf data file via EEGlab
         EEG = pop_biosig( fileName );
@@ -158,30 +157,49 @@ for subj_i = 1:length(subj_list)
         EEG = pop_editeventvals(EEG,'delete', trig_256);
 
 
-        %%% For resting-state data:
+%         %%% For pre-tACS resting-state data:
+%         % Delete double events
+%         if subj_list(subj_i)==710 && sess_i==1
+%             EEG = pop_editeventvals(EEG,'delete', [3 11]);
+%         elseif subj_list(subj_i)==752 && sess_i==1
+%             EEG = pop_editeventvals(EEG,'delete', [6 8 13]);
+%         elseif subj_list(subj_i)==752 && sess_i==2
+%             EEG = pop_editeventvals(EEG,'delete', [1 2 3]);
+%         elseif subj_list(subj_i)==600 && sess_i==2
+%             EEG = pop_editeventvals(EEG,'delete', [5 9]);
+%         elseif subj_list(subj_i)==923 && sess_i==2
+%             EEG = pop_editeventvals(EEG,'delete', [4]);
+%         elseif subj_list(subj_i)==508 && sess_i==2
+%             EEG = pop_editeventvals(EEG,'delete', [3 6]);
+%             EEG = pop_editeventvals(EEG,'insert',{ 4 ,[],[],[],[]},'changefield',{ 4 ,'type','3' }, 'changefield',{ 4 ,'edftype','3' }, 'changefield',{ 4 ,'latency', EEG.event(3).latency/EEG.srate+1 }); % latency of events (EEG.event.latency) is defined in data points, not in time. But when you want to change it, you need to define in seconds.
+%         elseif subj_list(subj_i)==681 && sess_i==2
+%             EEG = pop_editeventvals(EEG,'delete', [1 2 8 13]);
+%         elseif subj_list(subj_i)==876 && sess_i==2
+%             EEG = pop_editeventvals(EEG,'delete', [8 10]);
+%         elseif subj_list(subj_i)==134 && sess_i==2
+%             EEG = pop_editeventvals(EEG,'delete', [3]);
+%         elseif subj_list(subj_i)==502 && sess_i==2
+%             EEG = pop_editeventvals(EEG,'delete', [9]);
+%             EEG = pop_editeventvals(EEG,'insert',{ 2 ,[],[],[],[]},'changefield',{ 2 ,'type','2' }, 'changefield',{ 2 ,'edftype','2' }, 'changefield',{ 2 ,'latency', EEG.event(3).latency/EEG.srate-1 }); % latency of events (EEG.event.latency) is defined in data points, not in time. But when you want to change it, you need to define in seconds.
+%         end
+
+        %%% For post-tACS resting-state data:
+        if fileno==3 %when post-tACS resting-state is inside tACS-EEG bdf datatset
+            rs_begin = [find(strcmpi( {EEG.event.type}, '254' )) find(strcmpi( {EEG.event.type}, '510' ))];
+            if subj_list(subj_i)==681 && sess_i==2
+                rs_begin = rs_begin(1);
+            end
+            if length(rs_begin)>1 || isempty(rs_begin)
+                fprintf('****\nNone or too many resting-state start triggers in subject %i session %i\n', subj_list(subj_i), sessions(sess_i));
+                return
+            end
+            EEG = eeg_eegrej(EEG, [0,  EEG.event(rs_begin).latency]); % remove data during tACS
+            [ALLEEG, EEG, CURRENTSET] = eeg_store(ALLEEG, EEG); % store changes
+        end
+
         % Delete double events
-        if subj_list(subj_i)==710 && sess_i==1
-            EEG = pop_editeventvals(EEG,'delete', [3 11]);
-        elseif subj_list(subj_i)==752 && sess_i==1
-            EEG = pop_editeventvals(EEG,'delete', [6 8 13]);
-        elseif subj_list(subj_i)==752 && sess_i==2
-            EEG = pop_editeventvals(EEG,'delete', [1 2 3]);
-        elseif subj_list(subj_i)==600 && sess_i==2
-            EEG = pop_editeventvals(EEG,'delete', [5 9]);
-        elseif subj_list(subj_i)==923 && sess_i==2
-            EEG = pop_editeventvals(EEG,'delete', [4]);
-        elseif subj_list(subj_i)==508 && sess_i==2
-            EEG = pop_editeventvals(EEG,'delete', [3 6]);
-            EEG = pop_editeventvals(EEG,'insert',{ 4 ,[],[],[],[]},'changefield',{ 4 ,'type','3' }, 'changefield',{ 4 ,'edftype','3' }, 'changefield',{ 4 ,'latency', EEG.event(3).latency/EEG.srate+1 }); % latency of events (EEG.event.latency) is defined in data points, not in time. But when you want to change it, you need to define in seconds.
-        elseif subj_list(subj_i)==681 && sess_i==2
-            EEG = pop_editeventvals(EEG,'delete', [1 2 8 13]);
-        elseif subj_list(subj_i)==876 && sess_i==2
-            EEG = pop_editeventvals(EEG,'delete', [8 10]);
-        elseif subj_list(subj_i)==134 && sess_i==2
-            EEG = pop_editeventvals(EEG,'delete', [3]);
-        elseif subj_list(subj_i)==502 && sess_i==2
+        if subj_list(subj_i)==600 && sess_i==1 && fileno==4
             EEG = pop_editeventvals(EEG,'delete', [9]);
-            EEG = pop_editeventvals(EEG,'insert',{ 2 ,[],[],[],[]},'changefield',{ 2 ,'type','2' }, 'changefield',{ 2 ,'edftype','2' }, 'changefield',{ 2 ,'latency', EEG.event(3).latency/EEG.srate-1 }); % latency of events (EEG.event.latency) is defined in data points, not in time. But when you want to change it, you need to define in seconds.
         end
 
         % find or create trigger for resting-state onset  eyes-open & eyes-closed  (original codes = '1' / '3'. Other possibile codes = ':EOG (blinks, fast, large amplitude)' / ':EMG/Muscle'.)
@@ -196,7 +214,7 @@ for subj_i = 1:length(subj_list)
         close_end = sort([find(strcmpi( {EEG.event.type}, '4' )), ...
             find(strcmpi( {EEG.event.type}, ':Movement' )) ]);
 
-        % re-code to original code for resting-state onsets and offsets
+        % re-code to resting-state onsets and offsets
         for trig_i = 1:length(open_begin)
             EEG = pop_editeventvals(EEG,'changefield', {open_begin(trig_i)  'type' 'EyesOpenOnset'});
         end
@@ -285,7 +303,7 @@ for subj_i = 1:length(subj_list)
 
         % -- Save
         fprintf('\n****\nSave processed subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        SaveName = [file_type{typeno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_RawEEG.set'];
+        SaveName = [file_type{fileno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_RawEEG.set'];
         EEG = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
 
         clear EEG
@@ -386,7 +404,7 @@ end
 fileno = 4;
 
 % Loop over files
-for subj_i = 1:length(subj_list)
+for subj_i = 11:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
