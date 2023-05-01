@@ -42,7 +42,7 @@ cd('/Users/fsmits2/Downloads/eeglab2022.1')
 cd('/Users/fsmits2/Documents/PITA_analysis'); % return to PITA analysis folder
 
 % set paths to data
-Path2EEGsets = '/Users/fsmits2/Downloads/1 EEG data tacs-eeg/3 EEG sets processed';
+Path2EEGsets = '/Users/fsmits2/Downloads/1 EEG data r-s/EEG data r-s processed';
 
 % enter subject names
 subj_list =[669	557 363	638	989	383	502	733	442	575	710	262 ...
@@ -63,54 +63,69 @@ file_type = {rec1, rec2, rec3, rec4, rec5};
 %% Do the fourier Transform
 
 % Pre-specify a matrix (dataframe) to save outcomes in the size: Subject x session x channels x condition(eyes open vs. closed) x outcome(theta power, beta power, theta/beta ratio, number of 1-sec-epochs)
-datfr       = nan(length(subj_list), length(sessions), 30, 513, 600);
-datfr_dense = datfr;
+% % % datfr       = nan(length(subj_list), length(sessions), 30, 513, 600); %for tACS-EEG data
+% % % datfr_dense = datfr;
+datfr_rso   = nan(length(subj_list), length(sessions), 30, 513, 120); %for resting-state EEG data eyes-open
+datfr_rsc   = nan(length(subj_list), length(sessions), 30, 513, 120); %eyes-closed
+
 
 % Loop over subjects and sessions
-for subj_i = 1:length(subj_list)
+for subj_i = 28:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n*** Load tACS-EEG preprocessed data from: subject %i session %i\n', subj_list(subj_i), sessions(sess_i));
-        fileName = [file_type{3} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG_CleanEpochs.set'];
+        fileName = [file_type{1} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG.set'];
 
         % Load EEG set
         EEG      = pop_loadset('filename', fileName, 'filepath', Path2EEGsets);
 
-        % Prepare Fourier Transform
-        EEG.datax = double(EEG.data); % Put EEG data in double precision for good computation performance
+        % Split dataset into eyes-open and eyes-closed
+        openidx   = find(11 == str2double({EEG.event.type}));
+        closedidx = find(22 == str2double({EEG.event.type}));
+        openeps   = cell2mat({EEG.event(openidx).epoch});
+        closedeps = cell2mat({EEG.event(closedidx).epoch});
+        % Put EEG data in double precision for good computation performance
+        EEG.datax_o = double( EEG.data(:,:,openeps) ); 
+        EEG.datax_c = double( EEG.data(:,:,closedeps) ); 
 
+        % Prepare Fourier Transform
+% % %         EEG.datax = double( EEG.data); 
         nfft      = EEG.srate * 4; % For zero-padding (upsampling) and overlapping in Welch's method
-        nOverlap  = size(EEG.datax,2)/2; % For no overlap: 0;  for 50% overlap: size(EEG.datax,2)/2
+        nOverlap  = size(EEG.datax_o,2)/2; % For no overlap: 0;  for 50% overlap: size(EEG.datax,2)/2
 
         hannw     = hann(EEG.pnts); % Create Hann window to taper the data with.      = .5 * (1 - cos(2*pi*linspace( 0, 1, size(EEG.datax,2) ) ));
 
-        powspec   = nan( EEG.nbchan-2, EEG.srate*2+1, EEG.trials ); % pre-specify power spectrum variable to save FFT results
-        
+        powspec_o   = nan( EEG.nbchan-2, EEG.srate*2+1, size(EEG.datax_o,3) ); % pre-specify power spectrum variable to save FFT results
+        powspec_c   = nan( EEG.nbchan-2, EEG.srate*2+1, size(EEG.datax_c,3) ); % pre-specify power spectrum variable to save FFT results
+
         % Do the FFT. Loop over channels
         fprintf('\n*** Compute power spectrum - subject %i session %i\n', subj_list(subj_i), sessions(sess_i));
         for chani = 1:EEG.nbchan-2 % minus the last two channels (EMG): HEOG & VEOG
             % Do the FFT for each frequency and epoch using Welch's method (MATLAB's function pwelch)
-            [powspec(chani,:,:), hz] = pwelch( squeeze( EEG.datax(chani,:,:) ), hannw, nOverlap, nfft, EEG.srate );
+            [powspec_o(chani,:,:), hz] = pwelch( squeeze( EEG.datax_o(chani,:,:) ), hannw, nOverlap, nfft, EEG.srate );
+            [powspec_c(chani,:,:), hz] = pwelch( squeeze( EEG.datax_c(chani,:,:) ), hannw, nOverlap, nfft, EEG.srate );
         end
 
         % Save powespectra in the dense matrix:
         fprintf('\n*** Save dense power spectrum - subject %i session %i\n', subj_list(subj_i), sessions(sess_i));
-        datfr_dense(subj_i, sess_i, :, : , 1:EEG.trials) = powspec;
+        datfr_rso(subj_i, sess_i, :, : , 1:size(EEG.datax_o,3)) = powspec_o;
+        datfr_rsc(subj_i, sess_i, :, : , 1:size(EEG.datax_c,3)) = powspec_c;
 
-        % Save powerspectra per epoch in it's original position in the tACS-EEG timing
-        fprintf('\n*** Save power spectrum per epoch in original timing - subject %i session %i\n', subj_list(subj_i), sessions(sess_i));
-        for epoci = 1:EEG.trials      
-            timetrigg = str2double( EEG.event(epoci).type ) ;
-            block     = floor( timetrigg );
-            sec       = round( (timetrigg - block) * 100 );
-
-            epocpos   = (block-1) * 29 + sec;
-            datfr(subj_i, sess_i, :, : , epocpos) = powspec(:, :, epoci);
-        end
+% % %         %%% Only for tACS-EEG
+% % %         % Save powerspectra per epoch in it's original position in the tACS-EEG timing
+% % %         fprintf('\n*** Save power spectrum per epoch in original timing - subject %i session %i\n', subj_list(subj_i), sessions(sess_i));
+% % %         for epoci = 1:EEG.trials      
+% % %             timetrigg = str2double( EEG.event(epoci).type ) ;
+% % %             block     = floor( timetrigg );
+% % %             sec       = round( (timetrigg - block) * 100 );
+% % % 
+% % %             epocpos   = (block-1) * 29 + sec;
+% % %             datfr(subj_i, sess_i, :, : , epocpos) = powspec(:, :, epoci);
+% % %         end
 
         clear EEG
         ALLEEG(1:end) = [];
-        clear powspec; clear EEG.datax;
+        clear powspec_o; clear EEG.datax_o; clear powspec_c; clear EEG.datax_c;
 
     end
 end
@@ -119,24 +134,29 @@ end
 filename2='hz_saved.mat';
 save(filename2,'hz');
 
-filename='datfr_saved.mat';
-save(filename,'datfr', '-v7.3');
+filename='datfr_rso_saved.mat';
+save(filename,'datfr_rso', '-v7.3');
 
-filename='datfr_dense_saved.mat';
-save(filename,'datfr_dense', '-v7.3');
+filename1='datfr_rsc_saved.mat';
+save(filename1,'datfr_rsc', '-v7.3');
+
+% % % filename='datfr_dense_saved.mat';
+% % % save(filename,'datfr_dense', '-v7.3');
 
 
 
 %% Look at result | Topoplots for channel selection in spectral power analyses
 
 % Load the table with noisy channels (to be excluded from analysis)
-bdchns = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_20-Jan-2023.txt'] ,'Format','auto') );
+bdchns = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_14-Feb-2023.txt'] ,'Format','auto') );
 
 % pre-specify variable to save clean power outcomes in
-cleandatfr    = nan(length(subj_list), length(sessions), 30, 513, 600);
+% % % cleandatfr    = nan(length(subj_list), length(sessions), 30, 513, 600); % for tacs-EEG data
+cleandatfr_o    = nan(length(subj_list), length(sessions), 30, 513, 120); %eyes-open
+cleandatfr_c    = nan(length(subj_list), length(sessions), 30, 513, 120); %eyes-closed
 
 % Load EEG set
-fileName = 'TACSEEG-642-2_CleanEEG_CleanEpochs.set';
+fileName = [file_type{1} '642-2_CleanEEG.set'];
 EEG      = pop_loadset('filename', fileName, 'filepath', Path2EEGsets);
 
 for subj_i = 1:length(subj_list)
@@ -156,10 +176,47 @@ for subj_i = 1:length(subj_list)
 
         % Copy only from clean channels data from alldatfr to powdatfr
         fprintf('\n*** Save powspec from only no-noise channels from: subject %i session %i\n', subj_list(subj_i), sessions(sess_i));
-        cleandatfr(subj_i, sess_i, chanarray, :, :) = datfr(subj_i, sess_i, chanarray, :, :);
+        cleandatfr_o(subj_i, sess_i, chanarray, :, :) = datfr_rso(subj_i, sess_i, chanarray, :, :);
+        cleandatfr_c(subj_i, sess_i, chanarray, :, :) = datfr_rsc(subj_i, sess_i, chanarray, :, :);
 
     end
 end
+
+% filename='cleandatfr_saved.mat';
+% save(filename,'cleandatfr', '-v7.3');
+
+filename='cleandatfr_o_saved.mat';
+save(filename,'cleandatfr_o', '-v7.3');
+
+filename1='cleandatfr_c_saved.mat';
+save(filename1,'cleandatfr_c', '-v7.3');
+
+
+% Find Individual Alpha Peak Frequency (IAF)
+maxfrq_c = nan(length(subj_list), length(sessions), 1);
+for subj_i = 1:length(subj_list)
+    for sess_i = 1:length(sessions)
+
+%        datA = log10( squeeze( mean(mean(cleandatfr_o(subj_i,sess_i,13:17,:,:),5,'omitnan'),3,'omitnan') ) );
+        datB = log10( squeeze( mean(mean(cleandatfr_c(subj_i,sess_i,13:17,:,:),5,'omitnan'),3,'omitnan') ) );
+%         figure(3)
+%         plot(hz, datA,'k','LineWidth',3); hold on
+%         plot(hz, datB,'r','LineWidth',3)
+        alphafrqidx   = dsearchn(hz, [8  13]');
+        frqsvec = alphafrqidx(1):alphafrqidx(2);
+        datB2 = datB(alphafrqidx(1):alphafrqidx(2));
+        [maxpow, idx]  = max( datB2 );
+        maxfrqidx      = frqsvec(idx(1));
+        maxfrq         = hz(maxfrqidx);
+
+        maxfrq_c(subj_i, sess_i, :) = maxfrq;
+
+    end
+end
+
+filename3='maxfrq_c_saved.mat';
+save(filename3,'maxfrq_c');
+
 
 % Select frequencies
 frqidx   = dsearchn(hz, [4  7]');
@@ -189,9 +246,6 @@ for subj_i = 1:length(subj_list)
        
     end
 end
-
-% filename='cleandatfr_saved.mat';
-% save(filename,'cleandatfr', '-v7.3');
 
 % Define frequency bands
 betawin  = [14  30];
@@ -223,13 +277,15 @@ title({'4 - 7.5 Hz'});   c = colorbar; c.Label.String = 'Power \muV^2'; set(gca,
 
 % LOAD datfr as matrix (not cleandatfr)
 load hz_saved.mat
-datfr = importdata('datfr_saved.mat');
+% % % datfr = importdata('datfr_saved.mat');
+datfr_rso = importdata('datfr_rso_saved.mat');
+datfr_rsc = importdata('datfr_rsc_saved.mat');
 
 % Load the table with noisy channels (to be excluded from analysis)
-bdchns = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_20-Jan-2023.txt'] ,'Format','auto') );
+bdchns = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_14-Feb-2023.txt'] ,'Format','auto') );
 
 % Load EEG set
-fileName = 'TACSEEG-669-1_CleanEEG_CleanEpochs.set';
+fileName = [file_type{1} '642-2_CleanEEG.set'];
 EEG      = pop_loadset('filename', fileName, 'filepath', Path2EEGsets);
 
 % Select channels for. For theta activity: overall power is strongest over Fz and surrounding channels
@@ -240,12 +296,13 @@ for chani = 1:length(channames)
 end
 
 % Average over selected channels and frequencies
-powdat = nan(length(subj_list), length(sessions), 600);
+% % % powdat = nan(length(subj_list), length(sessions), 600); %for tACS_EEG data
+powdat = nan(length(subj_list), length(sessions), 120); %eyes-open
 
 % Select frequencies
-frqidx   = dsearchn(hz, [4  7]');
+frqidx   = dsearchn(hz, [4.75  5.25]');
 
-for subj_i = 1:length(subj_list)
+for subj_i = 11:length(subj_list)
     for sess_i = 1:length(sessions)
 
         % Remove noisy
@@ -262,15 +319,189 @@ for subj_i = 1:length(subj_list)
         
         % Extract from data
         dataextract = [];
-        dataextract = datfr(subj_i,sess_i, chans2use_now, frqidx(1):frqidx(2), :);
+        dataextract = datfr_rso(subj_i,sess_i, chans2use_now, frqidx(1):frqidx(2), :);
         % Average over channels and frequencies and log-transform
         powdat(subj_i,sess_i,:) = log10(squeeze( mean( mean(dataextract,4,'omitnan') ,3,'omitnan') ) );
        
     end
 end
 
-filename='powdat_theta_saved.mat';
+filename='powdat_rso_5Hz_saved.mat';
 save(filename,'powdat', '-v6');
+
+
+
+%% Plots for BRST2023 poster
+
+% LOAD datfr as matrix
+load hz_saved.mat
+datfr = importdata('datfr_saved.mat');
+
+% remove data from datasets with gelbridge - subject 989 (session 1) and 818 (session 2)
+subj989 = find(subj_list==989); datfr(subj989,1,:,:,:) = NaN;
+subj818 = find(subj_list==818); datfr(subj818,2,:,:,:) = NaN;
+
+% Load the table with noisy channels (to be excluded from analysis)
+bdchns = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_20-Jan-2023.txt'] ,'Format','auto') );
+
+% Load EEG set
+fileName = 'TACSEEG-669-1_CleanEEG_CleanEpochs.set';
+EEG      = pop_loadset('filename', fileName, 'filepath', Path2EEGsets);
+
+% Average over selected channels and frequencies
+powdatfull = nan(length(subj_list), length(sessions), 30, 600);
+
+% Select frequencies
+frqidx   = dsearchn(hz, [4.75  5.25]');
+
+for subj_i = 1:length(subj_list)
+    for sess_i = 1:length(sessions)
+
+        % Remove noisy channels
+        chanarray    = 1:EEG.nbchan-2;
+        badchans     = regexp(bdchns{subj_i,sess_i+1} , ',', 'split');
+        badchanarray = [];
+        if sum( strcmpi( badchans, '0') ) < 1
+            for bchni = 1:length(badchans)
+                badchanarray(bchni) = find( strcmpi( badchans{bchni}, {EEG.chanlocs.labels} ));
+            end
+        end
+        chanarray(badchanarray) = [];
+
+        % Extract from data per (clean) channel
+        for chani = chanarray
+            dataextractfull = [];
+            dataextractfull = datfr(subj_i, sess_i, chani, frqidx(1):frqidx(2), :);
+            % Average over channels and frequencies and log-transform
+            powdatfull(subj_i,sess_i,chani,:) = squeeze( mean(dataextractfull,4,'omitnan') );
+        end
+
+    end
+end
+
+% Read in conditions (real vs. sham tACS)
+conditions = readtable('Random_allocation_log_PITA_deblinded_matlab.csv');
+subjects = table2array(conditions(:,1));
+subjmatches = find( ismember(subjects, subj_list) > 0 );
+conds = conditions(subjmatches,:);
+% Couple conditions to dataframe rows
+s1_real = find( table2array(conds(:,2)) >  0 )';
+s1_sham = find( table2array(conds(:,2)) == 0 )';
+s2_real = find( table2array(conds(:,3)) >  0 )';
+s2_sham = find( table2array(conds(:,3)) == 0 )';
+
+% Define where to cut trials to divide data into 5 segments (of 4x 30-sec EEG recording each)
+cuts = 1:116:580;
+
+% Data per segment per condition
+powtopotheta1_sham  = mean( [ mean( log10( squeeze( mean( powdatfull(s1_sham, 1, :, cuts(1):cuts(2)-1) ,4,'omitnan') ) ) ,1,'omitnan') ...
+                        mean( log10( squeeze( mean( powdatfull(s2_sham, 2, :, cuts(1):cuts(2)-1) ,4,'omitnan') ) ) ,1,'omitnan') ] ,1) ;
+powtopotheta2_sham  = mean( [ mean( log10( squeeze( mean( powdatfull(s1_sham, 1, :, cuts(2):cuts(3)-1) ,4,'omitnan') ) ) ,1,'omitnan') ...
+                         mean( log10( squeeze( mean( powdatfull(s2_sham, 2, :, cuts(2):cuts(3)-1) ,4,'omitnan') ) ),1,'omitnan') ] ,1) ;
+powtopotheta3_sham  = mean( [ mean( log10( squeeze( mean( powdatfull(s1_sham, 1, :, cuts(3):cuts(4)-1) ,4,'omitnan') ) ) ,1,'omitnan') ...
+                        mean( log10( squeeze( mean( powdatfull(s2_sham, 2, :, cuts(3):cuts(4)-1) ,4,'omitnan') ) ),1,'omitnan') ] ,1) ;
+powtopotheta4_sham  = mean( [ mean( log10( squeeze( mean( powdatfull(s1_sham, 1, :, cuts(4):cuts(5)-1) ,4,'omitnan') ) ) ,1,'omitnan') ...
+                        mean( log10( squeeze( mean( powdatfull(s2_sham, 2, :, cuts(4):cuts(5)-1) ,4,'omitnan') ) ),1,'omitnan') ] ,1) ;
+powtopotheta5_sham  = mean( [ mean( log10( squeeze( mean( powdatfull(s1_sham, 1, :, cuts(5):580)       ,4,'omitnan') ) ) ,1,'omitnan') ...
+                        mean( log10( squeeze( mean( powdatfull(s2_sham, 2, :, cuts(5):580)       ,4,'omitnan') ) ),1,'omitnan') ] ,1) ;
+powtopotheta1_real  = mean( [ mean( log10( squeeze( mean( powdatfull(s1_real, 1, :, cuts(1):cuts(2)-1) ,4,'omitnan') ) ) ,1,'omitnan') ...
+                        mean( log10( squeeze( mean( powdatfull(s2_real, 2, :, cuts(1):cuts(2)-1) ,4,'omitnan') ) ),1,'omitnan') ] ,1) ;
+powtopotheta2_real  = mean( [ mean( log10( squeeze( mean( powdatfull(s1_real, 1, :, cuts(2):cuts(3)-1) ,4,'omitnan') ) ) ,1,'omitnan') ...
+                        mean( log10( squeeze( mean( powdatfull(s2_real, 2, :, cuts(2):cuts(3)-1) ,4,'omitnan') ) ),1,'omitnan') ] ,1) ;
+powtopotheta3_real  = mean( [ mean( log10( squeeze( mean( powdatfull(s1_real, 1, :, cuts(3):cuts(4)-1) ,4,'omitnan') ) ) ,1,'omitnan') ...
+                        mean( log10( squeeze( mean( powdatfull(s2_real, 2, :, cuts(3):cuts(4)-1) ,4,'omitnan') ) ),1,'omitnan') ] ,1) ;
+powtopotheta4_real  = mean( [ mean( log10( squeeze( mean( powdatfull(s1_real, 1, :, cuts(4):cuts(5)-1) ,4,'omitnan') ) ) ,1,'omitnan') ...
+                        mean( log10( squeeze( mean( powdatfull(s2_real, 2, :, cuts(4):cuts(5)-1) ,4,'omitnan') ) ),1,'omitnan') ] ,1) ;
+powtopotheta5_real  = mean( [ mean( log10( squeeze( mean( powdatfull(s1_real, 1, :, cuts(5):580)       ,4,'omitnan') ) ) ,1,'omitnan') ...
+                        mean( log10( squeeze( mean( powdatfull(s2_real, 2, :, cuts(5):580)       ,4,'omitnan') ) ),1,'omitnan') ] ,1) ;
+
+% Data per segment per condition
+powtopotheta1_sham  = mean( log10( squeeze( mean( powdatfull(s2_sham, 2, :, cuts(1):cuts(2)-1) ,4,'omitnan') ) ),1,'omitnan');
+powtopotheta2_sham  = mean( log10( squeeze( mean( powdatfull(s2_sham, 2, :, cuts(2):cuts(3)-1) ,4,'omitnan') ) ),1,'omitnan') ;
+powtopotheta3_sham  = mean( log10( squeeze( mean( powdatfull(s2_sham, 2, :, cuts(3):cuts(4)-1) ,4,'omitnan') ) ),1,'omitnan') ;
+powtopotheta4_sham  = mean( log10( squeeze( mean( powdatfull(s2_sham, 2, :, cuts(4):cuts(5)-1) ,4,'omitnan') ) ),1,'omitnan') ;
+powtopotheta5_sham  = mean( log10( squeeze( mean( powdatfull(s2_sham, 2, :, cuts(5):580)       ,4,'omitnan') ) ),1,'omitnan') ;
+powtopotheta1_real  = mean( log10( squeeze( mean( powdatfull(s2_real, 2, :, cuts(1):cuts(2)-1) ,4,'omitnan') ) ),1,'omitnan') ;
+powtopotheta2_real  = mean( log10( squeeze( mean( powdatfull(s2_real, 2, :, cuts(2):cuts(3)-1) ,4,'omitnan') ) ),1,'omitnan') ;
+powtopotheta3_real  = mean( log10( squeeze( mean( powdatfull(s2_real, 2, :, cuts(3):cuts(4)-1) ,4,'omitnan') ) ),1,'omitnan') ;
+powtopotheta4_real  = mean( log10( squeeze( mean( powdatfull(s2_real, 2, :, cuts(4):cuts(5)-1) ,4,'omitnan') ) ),1,'omitnan') ;
+powtopotheta5_real  = mean( log10( squeeze( mean( powdatfull(s2_real, 2, :, cuts(5):580)       ,4,'omitnan') ) ),1,'omitnan') ;
+
+
+
+figure(6); colormap jet
+clims_theta = [0.2 0.9];
+subplot(6,2,1); topoplot( mean( [powtopotheta1_real; powtopotheta2_real; powtopotheta3_real; powtopotheta4_real; powtopotheta5_real ],1), EEG.chanlocs(1:30)); %,'numcontour',0,'electrodes','numbers','shading','interp');
+title({'Real tACS, overall'}); c = colorbar; c.Label.String = 'Power \muV^2 (log10)'; set(gca,'clim',clims_theta);
+subplot(6,2,3); topoplot(powtopotheta1_real,  EEG.chanlocs(1:30)); %,'numcontour',0,'electrodes','numbers','shading','interp');
+%title({'1-4 min. real tACS'}); 
+set(gca,'clim',clims_theta);
+subplot(6,2,5); topoplot(powtopotheta2_real, EEG.chanlocs(1:30)); %,'numcontour',0,'electrodes','numbers','shading','interp');
+%title({'5-8 min. real tACS'}); 
+set(gca,'clim',clims_theta);
+subplot(6,2,7); topoplot(powtopotheta3_real, EEG.chanlocs(1:30)); %,'numcontour',0,'electrodes','numbers','shading','interp');
+%title({'9-12 min. real tACS'}); 
+set(gca,'clim',clims_theta);
+subplot(6,2,9); topoplot(powtopotheta4_real, EEG.chanlocs(1:30)); %,'numcontour',0,'electrodes','numbers','shading','interp');
+%title({'13-16 min. real tACS'}); 
+set(gca,'clim',clims_theta);
+subplot(6,2,11); topoplot(powtopotheta5_real, EEG.chanlocs(1:30)); %,'numcontour',0,'electrodes','numbers','shading','interp');
+%title({'17-20 min. real tACS'}); 
+set(gca,'clim',clims_theta);
+subplot(6,2,2); topoplot( mean( [powtopotheta1_sham; powtopotheta2_sham; powtopotheta3_sham; powtopotheta4_sham; powtopotheta5_sham ],1), EEG.chanlocs(1:30)); %,'numcontour',0,'electrodes','numbers','shading','interp');
+title({'Sham, overall'}); c = colorbar; c.Label.String = 'Power \muV^2 (log10)'; set(gca,'clim',clims_theta);
+subplot(6,2,4); topoplot(powtopotheta1_sham,  EEG.chanlocs(1:30)); %,'numcontour',0,'electrodes','numbers','shading','interp');
+%title({'1-4 min. sham'}); 
+set(gca,'clim',clims_theta);
+subplot(6,2,6); topoplot(powtopotheta2_sham, EEG.chanlocs(1:30)); %,'numcontour',0,'electrodes','numbers','shading','interp');
+%title({'5-8 min. sham'}); 
+set(gca,'clim',clims_theta);
+subplot(6,2,8); topoplot(powtopotheta3_sham, EEG.chanlocs(1:30)); %,'numcontour',0,'electrodes','numbers','shading','interp');
+%title({'9-12 min. sham'}); 
+set(gca,'clim',clims_theta);
+subplot(6,2,10); topoplot(powtopotheta4_sham, EEG.chanlocs(1:30)); %,'numcontour',0,'electrodes','numbers','shading','interp');
+%title({'13-16 min. sham'}); 
+set(gca,'clim',clims_theta);
+subplot(6,2,12); topoplot(powtopotheta5_sham, EEG.chanlocs(1:30)); %,'numcontour',0,'electrodes','numbers','shading','interp');
+%title({'17-20 min. sham'}); 
+set(gca,'clim',clims_theta);
+
+set(gcf, 'color', 'none');    
+set(gca, 'color', 'none');
+
+
+
+% plot real-sham difference maps
+diffmaptheta1_sham = powtopotheta1_real - powtopotheta1_sham;
+diffmaptheta2_sham = powtopotheta2_real - powtopotheta2_sham;
+diffmaptheta3_sham = powtopotheta3_real - powtopotheta3_sham;
+diffmaptheta4_sham = powtopotheta4_real - powtopotheta4_sham;
+diffmaptheta5_sham = powtopotheta5_real - powtopotheta5_sham;
+
+% Select channels for. For theta activity: overall power is strongest over Fz and surrounding channels
+channames = {'AF3' 'AF4' 'FC1' 'FC2' 'FC5' 'FC6' 'F7' 'F8'};
+chans2use = [];
+for chani = 1:length(channames)
+    chans2use(chani) = find( strcmpi( channames{chani}, {EEG.chanlocs.labels} ));
+end
+
+figure(8); colormap jet
+clims_diff_theta = [-0.15 0.15];
+subplot(1,5,1); topoplot(diffmaptheta1_sham,  EEG.chanlocs(chans2use));
+title({'real-sham difference, theta power (4-7 Hz), s1'});    c = colorbar; c.Label.String = 'Power \muV^2'; set(gca,'clim',clims_diff_theta);
+subplot(1,5,2); topoplot(diffmaptheta2_sham,   EEG.chanlocs(chans2use));
+title({'real-sham difference, theta power (4-7 Hz), s2'});    c = colorbar; c.Label.String = 'Power \muV^2'; set(gca,'clim',clims_diff_theta);
+subplot(1,5,3); topoplot(diffmaptheta3_sham,   EEG.chanlocs(chans2use));
+title({'real-sham difference, theta power (4-7 Hz), s3'});    c = colorbar; c.Label.String = 'Power \muV^2'; set(gca,'clim',clims_diff_theta);
+subplot(1,5,4); topoplot(diffmaptheta4_sham,   EEG.chanlocs(chans2use));
+title({'real-sham difference, theta power (4-7 Hz), s4'});    c = colorbar; c.Label.String = 'Power \muV^2'; set(gca,'clim',clims_diff_theta);
+subplot(1,5,5); topoplot(diffmaptheta5_sham,   EEG.chanlocs(chans2use));
+title({'real-sham difference, theta power (4-7 Hz), s5'});    c = colorbar; c.Label.String = 'Power \muV^2'; set(gca,'clim',clims_diff_theta);
+
+
+
+
+
 
 
 
@@ -520,27 +751,27 @@ conditions = readtable('Random_allocation_log_PITA_deblinded_matlab.csv');
 subjects = table2array(conditions(:,1));
 subjmatches = find( ismember(subjects, subj_list) > 0 );
 conds = conditions(subjmatches,:);
-conds_s1_real = find( table2array(conds(:,2)) >  0 )';
-conds_s1_real= find( table2array(conds(:,2)) == 0 )';
-conds_s2_real = find( table2array(conds(:,3)) >  0 )';
-conds_s2_sham = find( table2array(conds(:,3)) == 0 )';
+s1_real = find( table2array(conds(:,2)) >  0 )';
+s1_real= find( table2array(conds(:,2)) == 0 )';
+s2_real = find( table2array(conds(:,3)) >  0 )';
+s2_sham = find( table2array(conds(:,3)) == 0 )';
 
-powtopotheta30_sham  = mean( [log10( squeeze( mean( mean( mean( cleandatfr(conds_s1_sham, 1, :, thetaidx(1):thetaidx(2), 1:31)    ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) ) ...
-                              log10( squeeze( mean( mean( mean( cleandatfr(conds_s2_sham, 2, :, thetaidx(1):thetaidx(2), 1:31)    ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) )] ,2);
-powtopotheta150_sham = mean( [log10( squeeze( mean( mean( mean( cleandatfr(conds_s1_sham, 1, :, thetaidx(1):thetaidx(2), 150:180) ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) ) ...
-                              log10( squeeze( mean( mean( mean( cleandatfr(conds_s2_sham, 2, :, thetaidx(1):thetaidx(2), 150:180) ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) )] ,2);
-powtopotheta350_sham = mean( [log10( squeeze( mean( mean( mean( cleandatfr(conds_s1_sham, 1, :, thetaidx(1):thetaidx(2), 320:350) ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) ) ...
-                              log10( squeeze( mean( mean( mean( cleandatfr(conds_s2_sham, 2, :, thetaidx(1):thetaidx(2), 320:350) ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) )] ,2);
-powtopotheta500_sham = mean( [log10( squeeze( mean( mean( mean( cleandatfr(conds_s1_sham, 1, :, thetaidx(1):thetaidx(2), 470:500) ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) ) ...
-                              log10( squeeze( mean( mean( mean( cleandatfr(conds_s2_sham, 2, :, thetaidx(1):thetaidx(2), 470:500) ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) )] ,2);
-powtopotheta30_real  = mean( [log10( squeeze( mean( mean( mean( cleandatfr(conds_s1_real, 1, :, thetaidx(1):thetaidx(2), 1:31)    ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) ) ...
-                              log10( squeeze( mean( mean( mean( cleandatfr(conds_s2_real, 2, :, thetaidx(1):thetaidx(2), 1:31)    ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) )] ,2);
-powtopotheta150_real = mean( [log10( squeeze( mean( mean( mean( cleandatfr(conds_s1_real, 1, :, thetaidx(1):thetaidx(2), 150:180) ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) ) ...
-                              log10( squeeze( mean( mean( mean( cleandatfr(conds_s2_real, 2, :, thetaidx(1):thetaidx(2), 150:180) ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) )] ,2);
-powtopotheta350_real = mean( [log10( squeeze( mean( mean( mean( cleandatfr(conds_s1_real, 1, :, thetaidx(1):thetaidx(2), 320:350) ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) ) ...
-                              log10( squeeze( mean( mean( mean( cleandatfr(conds_s2_real, 2, :, thetaidx(1):thetaidx(2), 320:350) ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) )] ,2);
-powtopotheta500_real = mean( [log10( squeeze( mean( mean( mean( cleandatfr(conds_s1_real, 1, :, thetaidx(1):thetaidx(2), 470:500) ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) ) ...
-                              log10( squeeze( mean( mean( mean( cleandatfr(conds_s2_real, 2, :, thetaidx(1):thetaidx(2), 470:500) ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) )] ,2);
+powtopotheta30_sham  = mean( [log10( squeeze( mean( mean( mean( cleandatfr(s1_sham, 1, :, thetaidx(1):thetaidx(2), 1:31)    ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) ) ...
+                              log10( squeeze( mean( mean( mean( cleandatfr(s2_sham, 2, :, thetaidx(1):thetaidx(2), 1:31)    ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) )] ,2);
+powtopotheta150_sham = mean( [log10( squeeze( mean( mean( mean( cleandatfr(s1_sham, 1, :, thetaidx(1):thetaidx(2), 150:180) ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) ) ...
+                              log10( squeeze( mean( mean( mean( cleandatfr(s2_sham, 2, :, thetaidx(1):thetaidx(2), 150:180) ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) )] ,2);
+powtopotheta350_sham = mean( [log10( squeeze( mean( mean( mean( cleandatfr(s1_sham, 1, :, thetaidx(1):thetaidx(2), 320:350) ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) ) ...
+                              log10( squeeze( mean( mean( mean( cleandatfr(s2_sham, 2, :, thetaidx(1):thetaidx(2), 320:350) ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) )] ,2);
+powtopotheta500_sham = mean( [log10( squeeze( mean( mean( mean( cleandatfr(s1_sham, 1, :, thetaidx(1):thetaidx(2), 470:500) ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) ) ...
+                              log10( squeeze( mean( mean( mean( cleandatfr(s2_sham, 2, :, thetaidx(1):thetaidx(2), 470:500) ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) )] ,2);
+powtopotheta30_real  = mean( [log10( squeeze( mean( mean( mean( cleandatfr(s1_real, 1, :, thetaidx(1):thetaidx(2), 1:31)    ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) ) ...
+                              log10( squeeze( mean( mean( mean( cleandatfr(s2_real, 2, :, thetaidx(1):thetaidx(2), 1:31)    ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) )] ,2);
+powtopotheta150_real = mean( [log10( squeeze( mean( mean( mean( cleandatfr(s1_real, 1, :, thetaidx(1):thetaidx(2), 150:180) ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) ) ...
+                              log10( squeeze( mean( mean( mean( cleandatfr(s2_real, 2, :, thetaidx(1):thetaidx(2), 150:180) ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) )] ,2);
+powtopotheta350_real = mean( [log10( squeeze( mean( mean( mean( cleandatfr(s1_real, 1, :, thetaidx(1):thetaidx(2), 320:350) ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) ) ...
+                              log10( squeeze( mean( mean( mean( cleandatfr(s2_real, 2, :, thetaidx(1):thetaidx(2), 320:350) ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) )] ,2);
+powtopotheta500_real = mean( [log10( squeeze( mean( mean( mean( cleandatfr(s1_real, 1, :, thetaidx(1):thetaidx(2), 470:500) ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) ) ...
+                              log10( squeeze( mean( mean( mean( cleandatfr(s2_real, 2, :, thetaidx(1):thetaidx(2), 470:500) ,5,'omitnan') ,4,'omitnan') ,1,'omitnan') ) )] ,2);
 
 
 figure(7); colormap jet

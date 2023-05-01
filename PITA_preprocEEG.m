@@ -317,7 +317,7 @@ end
 
 fileno = 4;
 
-for subj_i = 1:length(subj_list)
+for subj_i = 11:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nStart pre-processing subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
@@ -404,7 +404,7 @@ end
 fileno = 4;
 
 % Loop over files
-for subj_i = 11:length(subj_list)
+for subj_i = 35:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
@@ -430,9 +430,9 @@ end
 
 %% [resting-state only] Epoch the data
 
-fileno = 2;
+fileno = 4;
 
-for subj_i = 1:length(subj_list)
+for subj_i = 34:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
@@ -442,17 +442,39 @@ for subj_i = 1:length(subj_list)
         EEG      = pop_loadset('filename', fileName , 'filepath', Path2EEGsets);
 
         % Check (& fix) if enough and the right triggers are present
-        if subj_list(subj_i)==502 && sess_i == 2
-            EEG = pop_editeventvals(EEG,'delete', length(EEG.event)-1);
-            EEG = pop_editeventvals(EEG,'insert',{ length(EEG.event)-1 ,[],[],[],[]}, 'changefield',{ length(EEG.event)-1 ,'type','EyesClosedOffset' },  'changefield',{ length(EEG.event)-1 ,'edftype','EyesClosedOffset' }, 'changefield',{ length(EEG.event)-1 ,'latency', EEG.event(end).latency/EEG.srate-1 }); % latency of events (EEG.event.latency) is defined in data points, not in time. But when you want to change it, you need to define in seconds.
-        elseif (subj_list(subj_i)==227 || subj_list(subj_i)==565) && sess_i == 2
-            EEG = pop_editeventvals(EEG,'insert',{ 1 ,[],[],[],[]}, 'changefield',{ 1 ,'type','EyesOpenOnset' },  'changefield',{ 1 ,'edftype','EyesOpenOnset' }, 'changefield',{ 1 ,'latency', (EEG.times(1)/1000)+1 });
-        elseif subj_list(subj_i)==915 && sess_i == 2
-            EEG = pop_editeventvals(EEG,'insert',{ length(EEG.event) ,[],[],[],[]}, 'changefield',{ length(EEG.event) ,'type','EyesClosedOffset' },  'changefield',{ length(EEG.event) ,'edftype','EyesClosedOffset' }, 'changefield',{ length(EEG.event) ,'latency',  (EEG.times(end)/1000)-1 });
-        elseif subj_list(subj_i)==202 && sess_i == 2
-            trig_20s = [find(strcmpi( {EEG.event.type}, '20' )) find(strcmpi( {EEG.event.type}, '21' )) find(strcmpi( {EEG.event.type}, '22' )) find(strcmpi( {EEG.event.type}, '23' )) find(strcmpi( {EEG.event.type}, '20' ))];
-        EEG = pop_editeventvals(EEG,'delete', trig_20s);
+% % %        % exceptions for pre-tACS resting-state eeg:
+% % %         if subj_list(subj_i)==502 && sess_i == 2
+% % %             EEG = pop_editeventvals(EEG,'delete', length(EEG.event)-1);
+% % %             EEG = pop_editeventvals(EEG,'insert',{ length(EEG.event)-1 ,[],[],[],[]}, 'changefield',{ length(EEG.event)-1 ,'type','EyesClosedOffset' },  'changefield',{ length(EEG.event)-1 ,'edftype','EyesClosedOffset' }, 'changefield',{ length(EEG.event)-1 ,'latency', EEG.event(end).latency/EEG.srate-1 }); % latency of events (EEG.event.latency) is defined in data points, not in time. But when you want to change it, you need to define in seconds.
+% % %         elseif (subj_list(subj_i)==227 || subj_list(subj_i)==565) && sess_i == 2
+% % %             EEG = pop_editeventvals(EEG,'insert',{ 1 ,[],[],[],[]}, 'changefield',{ 1 ,'type','EyesOpenOnset' },  'changefield',{ 1 ,'edftype','EyesOpenOnset' }, 'changefield',{ 1 ,'latency', (EEG.times(1)/1000)+1 });
+% % %         elseif subj_list(subj_i)==915 && sess_i == 2
+% % %             EEG = pop_editeventvals(EEG,'insert',{ length(EEG.event) ,[],[],[],[]}, 'changefield',{ length(EEG.event) ,'type','EyesClosedOffset' },  'changefield',{ length(EEG.event) ,'edftype','EyesClosedOffset' }, 'changefield',{ length(EEG.event) ,'latency',  (EEG.times(end)/1000)-1 });
+% % %         elseif subj_list(subj_i)==202 && sess_i == 2
+% % %             trig_20s = [find(strcmpi( {EEG.event.type}, '20' )) find(strcmpi( {EEG.event.type}, '21' )) find(strcmpi( {EEG.event.type}, '22' )) find(strcmpi( {EEG.event.type}, '23' )) find(strcmpi( {EEG.event.type}, '20' ))];
+% % %             EEG = pop_editeventvals(EEG,'delete', trig_20s);
+% % %         end
+        % exceptions for post-tACS eeg sets:
+        if subj_list(subj_i)==669 && sess_i == 2
+            EEG = pop_editeventvals(EEG,'delete', 2);
+        elseif subj_list(subj_i)==638 && sess_i == 2
+            EEG = pop_editeventvals(EEG,'delete', [2 9]);
+        elseif subj_list(subj_i)==989 && sess_i == 1
+            EEG = pop_editeventvals(EEG,'delete', 6);
+        elseif subj_list(subj_i)==227 && sess_i == 2
+            EEG = pop_editeventvals(EEG,'delete', [2 4 8]);
+        elseif subj_list(subj_i)==362 && sess_i == 2
+            EEG = pop_editeventvals(EEG,'insert',{5,[],[],[],[],[]},'changefield',{5,'latency',122.94},'changefield',{5,'type','EyesClosedOffset'},'changefield',{5,'edftype',271});
+            EEG = pop_editeventvals(EEG,'delete', [8]);
+        elseif subj_list(subj_i)==298 && sess_i == 2
+            EEG = pop_editeventvals(EEG,'delete', [7]);
+        elseif subj_list(subj_i)==681 && sess_i == 2
+            EEG = pop_editeventvals(EEG,'delete', [2]);
+        elseif subj_list(subj_i)==559 && sess_i == 1
+            EEG = pop_editeventvals(EEG,'insert',{7,[],[],[],[],[]},'changefield',{7,'latency',184.02},'changefield',{7,'type','EyesOpenOffset'},'changefield',{7,'edftype',322});
+
         end
+
         open_begin  = sort(find(strcmpi( {EEG.event.type}, 'EyesOpenOnset' ))); %Find the open/closed eyes onset/offset triggers
         close_end   = sort(find(strcmpi( {EEG.event.type}, 'EyesClosedOffset' )));
         if length(open_begin) ~= 2 || length(close_end) ~= 2
