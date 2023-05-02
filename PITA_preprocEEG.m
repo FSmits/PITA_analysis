@@ -474,7 +474,8 @@ for subj_i = 34:length(subj_list)
             EEG = pop_editeventvals(EEG,'delete', [2]);
         elseif subj_list(subj_i)==559 && sess_i == 1
             EEG = pop_editeventvals(EEG,'insert',{7,[],[],[],[],[]},'changefield',{7,'latency',184.02},'changefield',{7,'type','EyesOpenOffset'},'changefield',{7,'edftype',322});
-
+        elseif subj_list(subj_i)==383 && sess_i == 1
+            EEG = pop_editeventvals(EEG,'delete', [8]);
         end
 
         open_begin  = sort(find(strcmpi( {EEG.event.type}, 'EyesOpenOnset' ))); %Find the open/closed eyes onset/offset triggers
@@ -496,7 +497,7 @@ for subj_i = 34:length(subj_list)
             trgT0   = [open_begin  close_begin];
             trgTend = [open_end    close_end  ];
             T0   = EEG.event(trgT0(  trgi)).latency;
-            if subj_list(subj_i)==383 && sess_i==1
+            if subj_list(subj_i)==383 && sess_i==2 && fileno == 1
                 if trgi==2
                     Tend = (EEG.times(end)/1000)*256;
                 elseif trgi==3
@@ -564,7 +565,7 @@ bdchns        = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_'  
 fileno = 4;
 
 % Loop over files
-for subj_i = 6:length(subj_list)
+for subj_i = 27:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
@@ -741,18 +742,18 @@ end
 
 
 
+
 %         fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
 %         fileName = [file_type{fileno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG.set'];
-% 
-%         % Load EEG set
+%        % Load EEG set
 %         EEG      = pop_loadset('filename', fileName , 'filepath', Path2EEGsets);
 % 
-%         % Reverse eyes-open eyes-closed codes for subj 262 session 1
+%        % Reverse eyes-open eyes-closed codes for subj 262 session 1
 %         if subj_list(subj_i)==262 && sess_i==1
 %             for trigi = 1:length(EEG.event)
-%                 if EEG.event(trigi).type=='11'
+%                 if EEG.event(trigi).type=="11"
 %                     EEG = pop_editeventvals(EEG,'changefield', {trigi 'type' '0'});
-%                 elseif EEG.event(trigi).type=='22'
+%                 elseif EEG.event(trigi).type=="22"
 %                     EEG = pop_editeventvals(EEG,'changefield', {trigi 'type' '11'});
 %                 end
 %             end
