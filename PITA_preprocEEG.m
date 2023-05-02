@@ -74,11 +74,13 @@ close all
 cd('/Users/fsmits2/Downloads/eeglab2022.1')
 [ALLEEG, EEG, CURRENTSET, ALLCOM] = eeglab;
 
-cd('/Users/fsmits2/Documents/PITA_analysis'); % return to PITA analysis folder
-
 % set paths to data
 Path2EEGbdf  = '/Users/fsmits2/Downloads/1 EEG data tacs-eeg/';
 Path2EEGsets = '/Users/fsmits2/Downloads/1 EEG data tacs-eeg/post-tacs r-s processed';
+path2save    = '/Users/fsmits2/Documents/PITA_analysis';
+path2scripts = '/Users/fsmits2/MATLAB/Projects/PITA_analysissandbox';
+
+cd(path2scripts)
 
 % enter subject names
 subj_list =[669	557 363	638	989	383	502	733	442	575	710	262 ...
@@ -554,15 +556,15 @@ bdchns(:,1)   = num2cell(subj_list');
 % intrp_chans      = cell(length(subj_list),3);
 % intrp_chans(:,1) = num2cell(subj_list');
 
-rej_epocs     = table2array( readtable( [Path2EEGsets '/Overview_rejected_epochs_'      char(datetime('today')) '.txt'] ) );
-ICAcomps      = table2cell(  readtable( [Path2EEGsets '/Overview_ICAcomps_' char(datetime('today')) '.txt'] ) );
-bdchns        = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_' char(datetime('today')) '.txt'] ,'Format','auto') );
+rej_epocs     = table2array( readtable( [Path2EEGsets '/Overview_rejected_epochs_' char(datetime('today')) '.txt'] ) );
+ICAcomps      = table2cell(  readtable( [Path2EEGsets '/Overview_ICAcomps_'        char(datetime('today')) '.txt'] ) );
+bdchns        = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_'     char(datetime('today')) '.txt'] ,'Format','auto') );
 % intrp_chans   = table2cell(  readtable( [Path2EEGsets '/Overview_interpolated_channels' char(datetime('today')) '.txt'] ) ); %char(datetime('yesterday')) '.txt'] ) ); %
 
 fileno = 4;
 
 % Loop over files
-for subj_i = 36:length(subj_list)
+for subj_i = 6:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
@@ -709,8 +711,9 @@ for subj_i = 36:length(subj_list)
         fprintf('\n****\nSave clean data subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
         SaveName = [file_type{fileno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG.set'];
         EEG      = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
-        writecell(ICAcomps,     [Path2EEGsets '/Overview_ICAcomps_'        char(datetime('today')) '.txt'], 'Delimiter',',');
-        writecell(bdchns,       [Path2EEGsets '/Overview_badchannels_'     char(datetime('today')) '.txt'], 'Delimiter',',');
+        cd(path2save);
+        writecell(  ICAcomps,   [Path2EEGsets '/Overview_ICAcomps_'        char(datetime('today')) '.txt'], 'Delimiter',',');
+        writecell(  bdchns,     [Path2EEGsets '/Overview_badchannels_'     char(datetime('today')) '.txt'], 'Delimiter',',');
         writematrix(rej_epocs,  [Path2EEGsets '/Overview_rejected_epochs_' char(datetime('today')) '.txt'], 'Delimiter',',');
 
         m2 = 0;
@@ -730,7 +733,7 @@ for subj_i = 36:length(subj_list)
         cd('/Users/fsmits2/Downloads/eeglab2022.1')
         [ALLEEG, EEG, CURRENTSET, ALLCOM] = eeglab;
 
-        cd('/Users/fsmits2/Documents/PITA_analysis'); % return to PITA analysis folder
+        cd(path2scripts); % return to PITA analysis folder
 
     end
 end
@@ -738,165 +741,164 @@ end
 
 
 
-
-        fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        fileName = [file_type{fileno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG.set'];
-
-        % Load EEG set
-        EEG      = pop_loadset('filename', fileName , 'filepath', Path2EEGsets);
-
-        % Reverse eyes-open eyes-closed codes for subj 262 session 1
-        if subj_list(subj_i)==262 && sess_i==1
-            for trigi = 1:length(EEG.event)
-                if EEG.event(trigi).type=='11'
-                    EEG = pop_editeventvals(EEG,'changefield', {trigi 'type' '0'});
-                elseif EEG.event(trigi).type=='22'
-                    EEG = pop_editeventvals(EEG,'changefield', {trigi 'type' '11'});
-                end
-            end
-            for trigi = 1:length(EEG.event)
-                if EEG.event(trigi).type=='0'
-                    EEG = pop_editeventvals(EEG,'changefield', {trigi 'type' '22'});
-                else
-                    continue
-                end
-            end
-        end
-
-
-
-
-
-
-
-
-%% Re-do cleaning for correctly rejecting epocs and saving set with clean epochs only
-
-% initiate or load matrix to save no. of rejected epochs and rejected components per subject and interpolated and noisy channels:
-rej_epocs     = [subj_list'  nan(length(subj_list),length(sessions)*2)];
-
-ICAcomps      = table2cell(  readtable( [Path2EEGsets '/Overview_ICAcomps_20-Jan-2023.txt'] ) );
-bdchns        = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_20-Jan-2023.txt'] ,'Format','auto') );
-
-rej_epocs     = table2array( readtable( [Path2EEGsets '/Overview_rejected_epochs_' char(datetime('today')) '.txt'] ) );
-
-fileno = 4;
-
-% Loop over files
-for subj_i = 31:length(subj_list)
-    for sess_i = 1:length(sessions)
-
-        fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        fileName = [file_type{fileno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG.set'];
-
-        % Load EEG set
-        EEG      = pop_loadset('filename', fileName, 'filepath', Path2EEGsets);
-
-        [ALLEEG, EEG, CURRENTSET] = eeg_store( ALLEEG, EEG, 0 );
-        EEG = eeg_checkset( EEG );
-
-%         % Leave noisy channels (previously detected and saved) out of consideration for epoch rejection
-%         badchannels = bdchns{subj_i, sess_i+1};
-%         chanarray   = 1:length(EEG.chanlocs)-2; %minus last two channels (EMG chans: HEOG, VEOG)
-%         if sum( strcmpi( badchannels, '0') ) < 1
-%             badchans = regexp(badchannels, ',', 'split');
-%             noisychannels = [];
-%             for bchni = 1:length(badchans)
-%                 noisychannels(bchni) = find( strcmpi( badchans{bchni}, {EEG.chanlocs.labels} ));
-%             end
-%             chanarray(noisychannels) = []; % remove the noisy channels from chanarray
-%         end
+%         fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
+%         fileName = [file_type{fileno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG.set'];
 % 
-%         % Semi-automatic artifact rejection
-%         %     Gradient:  Specifies that the absolute difference between two adjacent sample points of data must not exceed a value (artifact of weird spikes). Starting values from Boost tutorial: Gradient: 75 μV
-%         %     Amplitude: Specifies that the voltage must not  exceed a certain value (artifacts like eye blinks). Starting values from Boost tutorial: Max-Min: 150 μV/200 ms
-%         %     Diff max-Min: Sets the threshold for the difference between the minimum and maximum voltages within the entire segment (voltage drifts). Starting values from Boost tutorial: Amplitude: -100 μV, +100 μV"
-%  %       ALLEEG  = EEG; CURRENTSET = 1; % Define ALLEEG and CURRENSET to enable trial rejection via pop_eegplot()
-%         winpnts = round(200/(1000/EEG.srate)); % points for window of 200 ms segments in the epoch
-%         winidx  = 1:winpnts:EEG.pnts; 
-%         windiff = nan(1,length(winidx));
-%         EEG.reject.rejmanual = zeros(1, EEG.trials); % Initialize the array for marked trials
-%         EEG.reject.rejmanualE = zeros(length(EEG.chanlocs), EEG.trials);
+%         % Load EEG set
+%         EEG      = pop_loadset('filename', fileName , 'filepath', Path2EEGsets);
 % 
-%         % Loop over channels and epochs
-%         for ichan = chanarray(1:end-2) % exclude last two channels (VEOG & HEOG)
-%             for itrial = 1:EEG.trials
-%                 gradient = max( abs( diff(EEG.data(ichan, :, itrial)) ) );
-%                 ampliMax = max(EEG.data(ichan, :, itrial));
-%                 ampliMin = min(EEG.data(ichan, :, itrial));
-%                 for iwin = 1:length(winidx)-1
-%                     [winmin, winmax] = bounds(EEG.data( ichan, winidx(iwin):winidx(iwin)+winpnts-1, itrial));
-%                     windiff(iwin) = diff([winmin, winmax]);
+%         % Reverse eyes-open eyes-closed codes for subj 262 session 1
+%         if subj_list(subj_i)==262 && sess_i==1
+%             for trigi = 1:length(EEG.event)
+%                 if EEG.event(trigi).type=='11'
+%                     EEG = pop_editeventvals(EEG,'changefield', {trigi 'type' '0'});
+%                 elseif EEG.event(trigi).type=='22'
+%                     EEG = pop_editeventvals(EEG,'changefield', {trigi 'type' '11'});
 %                 end
-%                 diffV = max(windiff);
-% 
-%                 if gradient > 50 || ampliMax > 75 || ampliMin < -75 || diffV > 100  
-%                     EEG.reject.rejmanual(1,itrial) = 1; % Mark the trial when a criterium is met
-%                     EEG.reject.rejmanualE(ichan,itrial) = 1;
+%             end
+%             for trigi = 1:length(EEG.event)
+%                 if EEG.event(trigi).type=='0'
+%                     EEG = pop_editeventvals(EEG,'changefield', {trigi 'type' '22'});
+%                 else
+%                     continue
 %                 end
 %             end
 %         end
+
+
+
+
+
+
+
+
+% %% Re-do cleaning for correctly rejecting epocs and saving set with clean epochs only
 % 
-%         [ALLEEG EEG CURRENTSET] = eeg_store(ALLEEG, EEG, CURRENTSET);
+% % initiate or load matrix to save no. of rejected epochs and rejected components per subject and interpolated and noisy channels:
+% rej_epocs     = [subj_list'  nan(length(subj_list),length(sessions)*2)];
 % 
-%         % View the marked trials in plot
-%         %   Scale value to 100 and 29 epochs per window. Pay attention to VEOG.
-%         %   Reject the epoch around tACS artifact 
-%         rej_epocs(subj_i,1+sess_i) = EEG.trials; % Save total number of epochs
-%         find(EEG.reject.rejmanual > 0) % See the marked epoch numbers
+% ICAcomps      = table2cell(  readtable( [Path2EEGsets '/Overview_ICAcomps_20-Jan-2023.txt'] ) );
+% bdchns        = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_20-Jan-2023.txt'] ,'Format','auto') );
+% 
+% rej_epocs     = table2array( readtable( [Path2EEGsets '/Overview_rejected_epochs_' char(datetime('today')) '.txt'] ) );
+% 
+% fileno = 4;
+% 
+% % Loop over files
+% for subj_i = 31:length(subj_list)
+%     for sess_i = 1:length(sessions)
+% 
+%         fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
+%         fileName = [file_type{fileno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG.set'];
+% 
+%         % Load EEG set
+%         EEG      = pop_loadset('filename', fileName, 'filepath', Path2EEGsets);
+% 
+%         [ALLEEG, EEG, CURRENTSET] = eeg_store( ALLEEG, EEG, 0 );
 %         EEG = eeg_checkset( EEG );
-%         pop_eegplot( EEG, 1, 1, 0); % Plot data with marked epochs but do not immediately reject, only mark as noisy
+% 
+% %         % Leave noisy channels (previously detected and saved) out of consideration for epoch rejection
+% %         badchannels = bdchns{subj_i, sess_i+1};
+% %         chanarray   = 1:length(EEG.chanlocs)-2; %minus last two channels (EMG chans: HEOG, VEOG)
+% %         if sum( strcmpi( badchannels, '0') ) < 1
+% %             badchans = regexp(badchannels, ',', 'split');
+% %             noisychannels = [];
+% %             for bchni = 1:length(badchans)
+% %                 noisychannels(bchni) = find( strcmpi( badchans{bchni}, {EEG.chanlocs.labels} ));
+% %             end
+% %             chanarray(noisychannels) = []; % remove the noisy channels from chanarray
+% %         end
+% % 
+% %         % Semi-automatic artifact rejection
+% %         %     Gradient:  Specifies that the absolute difference between two adjacent sample points of data must not exceed a value (artifact of weird spikes). Starting values from Boost tutorial: Gradient: 75 μV
+% %         %     Amplitude: Specifies that the voltage must not  exceed a certain value (artifacts like eye blinks). Starting values from Boost tutorial: Max-Min: 150 μV/200 ms
+% %         %     Diff max-Min: Sets the threshold for the difference between the minimum and maximum voltages within the entire segment (voltage drifts). Starting values from Boost tutorial: Amplitude: -100 μV, +100 μV"
+% %  %       ALLEEG  = EEG; CURRENTSET = 1; % Define ALLEEG and CURRENSET to enable trial rejection via pop_eegplot()
+% %         winpnts = round(200/(1000/EEG.srate)); % points for window of 200 ms segments in the epoch
+% %         winidx  = 1:winpnts:EEG.pnts; 
+% %         windiff = nan(1,length(winidx));
+% %         EEG.reject.rejmanual = zeros(1, EEG.trials); % Initialize the array for marked trials
+% %         EEG.reject.rejmanualE = zeros(length(EEG.chanlocs), EEG.trials);
+% % 
+% %         % Loop over channels and epochs
+% %         for ichan = chanarray(1:end-2) % exclude last two channels (VEOG & HEOG)
+% %             for itrial = 1:EEG.trials
+% %                 gradient = max( abs( diff(EEG.data(ichan, :, itrial)) ) );
+% %                 ampliMax = max(EEG.data(ichan, :, itrial));
+% %                 ampliMin = min(EEG.data(ichan, :, itrial));
+% %                 for iwin = 1:length(winidx)-1
+% %                     [winmin, winmax] = bounds(EEG.data( ichan, winidx(iwin):winidx(iwin)+winpnts-1, itrial));
+% %                     windiff(iwin) = diff([winmin, winmax]);
+% %                 end
+% %                 diffV = max(windiff);
+% % 
+% %                 if gradient > 50 || ampliMax > 75 || ampliMin < -75 || diffV > 100  
+% %                     EEG.reject.rejmanual(1,itrial) = 1; % Mark the trial when a criterium is met
+% %                     EEG.reject.rejmanualE(ichan,itrial) = 1;
+% %                 end
+% %             end
+% %         end
+% % 
+% %         [ALLEEG EEG CURRENTSET] = eeg_store(ALLEEG, EEG, CURRENTSET);
+% % 
+% %         % View the marked trials in plot
+% %         %   Scale value to 100 and 29 epochs per window. Pay attention to VEOG.
+% %         %   Reject the epoch around tACS artifact 
+% %         rej_epocs(subj_i,1+sess_i) = EEG.trials; % Save total number of epochs
+% %         find(EEG.reject.rejmanual > 0) % See the marked epoch numbers
+% %         EEG = eeg_checkset( EEG );
+% %         pop_eegplot( EEG, 1, 1, 0); % Plot data with marked epochs but do not immediately reject, only mark as noisy
+% % 
+% % 
+% %         m0 = -1;
+% %         while m0 == -1
+% %             m0 = input('Ready to reject epocs? ','s');
+% %             while isempty(m0)
+% %                 m0 = input('Ready to reject epocs? [yes]: ','s');
+% %             end
+% %         end
+% % 
+% %         noisyepocs = find(EEG.reject.rejmanual > 0) % see & save final series of marked epochs
+% % 
+% %         m1 = [] ;
+% %         while isempty(m1)
+% %             m1 = input('How many epochs rejected? [enter number]: ','s');
+% %         end
+% % 
+% %         rej_epocs(subj_i,3+sess_i) = str2double(m1);
+% %         EEG.epochdescription       = [m1 '/' num2str(rej_epocs(subj_i,1+sess_i)) ' trials rejected'];
+% %         EEG                        = pop_rejepoch( EEG, noisyepocs , 1);
+% %         [ALLEEG EEG CURRENTSET]    = pop_newset(ALLEEG, EEG, CURRENTSET,'gui','off');
+% %         EEG = eeg_checkset( EEG );
+% %         [ALLEEG, EEG, CURRENTSET]  = eeg_store( ALLEEG, EEG );
 % 
 % 
-%         m0 = -1;
-%         while m0 == -1
-%             m0 = input('Ready to reject epocs? ','s');
-%             while isempty(m0)
-%                 m0 = input('Ready to reject epocs? [yes]: ','s');
+%         % Save
+%         fprintf('\n****\nSave clean data subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
+%         SaveName = [file_type{fileno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG_CleanEpochs.set'];
+%         EEG      = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
+%         writematrix(rej_epocs,  [Path2EEGsets '/Overview_rejected_epochs_' char(datetime('today')) '.txt'], 'Delimiter',',');
+%        
+%         m2 = 0;
+%         while m2 == 0
+%             m2 = input('Continue? [Y/N] ','s');
+%             if m2 == 'Y'
+%                 continue
+%             else
+%                 return
 %             end
 %         end
 % 
-%         noisyepocs = find(EEG.reject.rejmanual > 0) % see & save final series of marked epochs
+%         clear EEG
+%         close all
 % 
-%         m1 = [] ;
-%         while isempty(m1)
-%             m1 = input('How many epochs rejected? [enter number]: ','s');
-%         end
+%         % open EEGlab
+%         cd('/Users/fsmits2/Downloads/eeglab2022.1')
+%         [ALLEEG, EEG, CURRENTSET, ALLCOM] = eeglab;
 % 
-%         rej_epocs(subj_i,3+sess_i) = str2double(m1);
-%         EEG.epochdescription       = [m1 '/' num2str(rej_epocs(subj_i,1+sess_i)) ' trials rejected'];
-%         EEG                        = pop_rejepoch( EEG, noisyepocs , 1);
-%         [ALLEEG EEG CURRENTSET]    = pop_newset(ALLEEG, EEG, CURRENTSET,'gui','off');
-%         EEG = eeg_checkset( EEG );
-%         [ALLEEG, EEG, CURRENTSET]  = eeg_store( ALLEEG, EEG );
-
-
-        % Save
-        fprintf('\n****\nSave clean data subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
-        SaveName = [file_type{fileno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG_CleanEpochs.set'];
-        EEG      = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
-        writematrix(rej_epocs,  [Path2EEGsets '/Overview_rejected_epochs_' char(datetime('today')) '.txt'], 'Delimiter',',');
-       
-        m2 = 0;
-        while m2 == 0
-            m2 = input('Continue? [Y/N] ','s');
-            if m2 == 'Y'
-                continue
-            else
-                return
-            end
-        end
-
-        clear EEG
-        close all
-
-        % open EEGlab
-        cd('/Users/fsmits2/Downloads/eeglab2022.1')
-        [ALLEEG, EEG, CURRENTSET, ALLCOM] = eeglab;
-
-        cd('/Users/fsmits2/Documents/PITA_analysis'); % return to PITA analysis folder
-
-    end
-end
-
+%         cd(path2scripts); % return to PITA analysis folder
+% 
+%     end
+% end
+% 
 
