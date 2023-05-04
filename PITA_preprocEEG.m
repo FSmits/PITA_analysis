@@ -565,7 +565,7 @@ bdchns        = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_'  
 fileno = 4;
 
 % Loop over files
-for subj_i = 27:length(subj_list)
+for subj_i = 30:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
@@ -670,7 +670,7 @@ for subj_i = 27:length(subj_list)
                 end
                 diffV = max(windiff);
 
-                if gradient > 50 || ampliMax > 75 || ampliMin < -75 || diffV > 100  
+                if gradient > 50 || ampliMax > 100 || ampliMin < -100 || diffV > 150  % gradient > 50 || ampliMax > 75 || ampliMin < -75 || diffV > 150  
                     EEG.reject.rejmanual(1,itrial) = 1; % Mark the trial when a criterium is met
                     EEG.reject.rejmanualE(ichan,itrial) = 1;
                 end
