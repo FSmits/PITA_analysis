@@ -557,15 +557,15 @@ bdchns(:,1)   = num2cell(subj_list');
 % intrp_chans      = cell(length(subj_list),3);
 % intrp_chans(:,1) = num2cell(subj_list');
 
-rej_epocs     = table2array( readtable( [Path2EEGsets '/Overview_rejected_epochs_' char(datetime('today')) '.txt'] ) );
-ICAcomps      = table2cell(  readtable( [Path2EEGsets '/Overview_ICAcomps_'        char(datetime('today')) '.txt'] ) );
-bdchns        = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_'     char(datetime('today')) '.txt'] ,'Format','auto') );
+rej_epocs     = table2array( readtable( [Path2EEGsets '/Overview_rejected_epochs_' '08-May-2023' '.txt'] ) ); %char(datetime('today'))
+ICAcomps      = table2cell(  readtable( [Path2EEGsets '/Overview_ICAcomps_'        '08-May-2023' '.txt'] ) );
+bdchns        = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_'     '08-May-2023' '.txt'] ,'Format','auto') );
 % intrp_chans   = table2cell(  readtable( [Path2EEGsets '/Overview_interpolated_channels' char(datetime('today')) '.txt'] ) ); %char(datetime('yesterday')) '.txt'] ) ); %
 
 fileno = 4;
 
 % Loop over files
-for subj_i = 30:length(subj_list)
+for subj_i = 39:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
