@@ -42,7 +42,7 @@ cd('/Users/fsmits2/Downloads/eeglab2022.1')
 cd('/Users/fsmits2/Documents/PITA_analysis'); % return to PITA analysis folder
 
 % set paths to data
-Path2EEGsets = '/Users/fsmits2/Downloads/1 EEG data r-s/EEG data r-s processed';
+Path2EEGsets = '/Users/fsmits2/Downloads/1 EEG data tacs-eeg/post-tacs r-s processed/';
 
 % enter subject names
 subj_list =[669	557 363	638	989	383	502	733	442	575	710	262 ...
@@ -68,13 +68,15 @@ file_type = {rec1, rec2, rec3, rec4, rec5};
 datfr_rso   = nan(length(subj_list), length(sessions), 30, 513, 120); %for resting-state EEG data eyes-open
 datfr_rsc   = nan(length(subj_list), length(sessions), 30, 513, 120); %eyes-closed
 
+% Which task (file type) you want to analyze?
+fileno = 4;
 
 % Loop over subjects and sessions
-for subj_i = 28:length(subj_list)
+for subj_i = 15:length(subj_list)
     for sess_i = 1:length(sessions)
 
-        fprintf('\n*** Load tACS-EEG preprocessed data from: subject %i session %i\n', subj_list(subj_i), sessions(sess_i));
-        fileName = [file_type{1} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG.set'];
+        fprintf('\n*** Load preprocessed data from: subject %i session %i\n', subj_list(subj_i), sessions(sess_i));
+        fileName = [file_type{fileno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG.set'];
 
         % Load EEG set
         EEG      = pop_loadset('filename', fileName, 'filepath', Path2EEGsets);
@@ -85,11 +87,11 @@ for subj_i = 28:length(subj_list)
         openeps   = cell2mat({EEG.event(openidx).epoch});
         closedeps = cell2mat({EEG.event(closedidx).epoch});
         % Put EEG data in double precision for good computation performance
+% % %         EEG.datax = double( EEG.data); 
         EEG.datax_o = double( EEG.data(:,:,openeps) ); 
         EEG.datax_c = double( EEG.data(:,:,closedeps) ); 
 
         % Prepare Fourier Transform
-% % %         EEG.datax = double( EEG.data); 
         nfft      = EEG.srate * 4; % For zero-padding (upsampling) and overlapping in Welch's method
         nOverlap  = size(EEG.datax_o,2)/2; % For no overlap: 0;  for 50% overlap: size(EEG.datax,2)/2
 
@@ -148,7 +150,7 @@ save(filename1,'datfr_rsc', '-v7.3');
 %% Look at result | Topoplots for channel selection in spectral power analyses
 
 % Load the table with noisy channels (to be excluded from analysis)
-bdchns = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_14-Feb-2023.txt'] ,'Format','auto') );
+bdchns = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_05-Jun-2023.txt'] ,'Format','auto') );
 
 % pre-specify variable to save clean power outcomes in
 % % % cleandatfr    = nan(length(subj_list), length(sessions), 30, 513, 600); % for tacs-EEG data

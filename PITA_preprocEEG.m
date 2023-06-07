@@ -559,7 +559,7 @@ bdchns(:,1)   = num2cell(subj_list');
 
 rej_epocs     = table2array( readtable( [Path2EEGsets '/Overview_rejected_epochs_' '08-May-2023' '.txt'] ) ); %char(datetime('today'))
 ICAcomps      = table2cell(  readtable( [Path2EEGsets '/Overview_ICAcomps_'        '08-May-2023' '.txt'] ) );
-bdchns        = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_'     '08-May-2023' '.txt'] ,'Format','auto') );
+bdchns        = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_'     '08-May-2023' '.txt'] ) ); %,'Format','auto') );
 % intrp_chans   = table2cell(  readtable( [Path2EEGsets '/Overview_interpolated_channels' char(datetime('today')) '.txt'] ) ); %char(datetime('yesterday')) '.txt'] ) ); %
 
 fileno = 4;
@@ -902,4 +902,6 @@ end
 %     end
 % end
 % 
+
+
 
