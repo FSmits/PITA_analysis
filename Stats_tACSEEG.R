@@ -232,7 +232,7 @@ plot(fit.gamma)
 lmm <- lmer( power ~ basepow * condition * session * block * epoch + (1|subject/session), data = datlong.old, control = lmerControl(optimizer="bobyqa"))
 tab_model(lmm) #, p.adjust = "fdr") 
 
-lmm0 <- lmer( power ~ basepow * condition * block  + (1|subject/session), data = datlong.old, control = lmerControl(optimizer="bobyqa"))
+lmm0 <- lmer( power ~ basepow * condition * session * block  + (1|subject/session), data = datlong.old, control = lmerControl(optimizer="bobyqa"))
 tab_model(lmm0, p.adjust = "fdr") 
 summary(lmm0) 
 plot_model(lmm0, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","condition","basepow")) + ylab("power") + theme_bw() 
@@ -357,8 +357,8 @@ lo <- ggplot(plotdata.lowbasepow, aes(x=blockphase, y=mean, group=condition, fil
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.2, size = 0.3, position=position_dodge(0.01)) +
   geom_line(size=0.7, aes(color=condition, linetype=condition)) + 
   #ylim(c(-0.28,-0.18)) +
-  geom_point(size = 3, stroke = 1, aes(colour=condition, shape=condition)) +
-  ylab("Spectral power") + xlab("block") + 
+  geom_point(size = 2, stroke = 1, aes(colour=condition, shape=condition)) +
+  ylab("Spectral power") + xlab("block") + ylim(-.1, 1) +
   scale_colour_manual(values=c("#999999","#28558f")) + scale_fill_manual(values=c("#999999","#28558f")) +
   facet_wrap( . ~ session)
 
@@ -378,8 +378,8 @@ hi <- ggplot(plotdata.highbasepow, aes(x=blockphase, y=mean, group=condition, fi
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.2, size = 0.3, position=position_dodge(0.01)) +
   geom_line(size=0.7, aes(color=condition, linetype=condition)) + 
   #ylim(c(-0.28,-0.18)) +
-  geom_point(size = 3, stroke = 1, aes(colour=condition, shape=condition)) +
-  ylab("Spectral power") + xlab("block") + 
+  geom_point(size = 2, stroke = 1, aes(colour=condition, shape=condition)) +
+  ylab("Spectral power") + xlab("block") + ylim(-.1, 1) +
   scale_colour_manual(values=c("#999999","#28558f")) + scale_fill_manual(values=c("#999999","#28558f")) +
   facet_wrap( . ~ session)
 
