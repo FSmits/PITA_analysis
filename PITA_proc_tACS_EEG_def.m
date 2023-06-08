@@ -72,8 +72,13 @@ datfr_rsc   = nan(length(subj_list), length(sessions), 30, 513, 120); %eyes-clos
 fileno = 4;
 
 % Loop over subjects and sessions
-for subj_i = 15:length(subj_list)
+for subj_i = 1:length(subj_list)
     for sess_i = 1:length(sessions)
+
+        %%% for post-tACS rest EEG only (subj 989 and 733 have gel bridge data in session 1 - not usable):
+        if (subj_list(subj_i) == 989 && sess_i == 1) || (subj_list(subj_i) == 733 && sess_i == 1)
+            continue
+        end
 
         fprintf('\n*** Load preprocessed data from: subject %i session %i\n', subj_list(subj_i), sessions(sess_i));
         fileName = [file_type{fileno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG.set'];
@@ -150,7 +155,7 @@ save(filename1,'datfr_rsc', '-v7.3');
 %% Look at result | Topoplots for channel selection in spectral power analyses
 
 % Load the table with noisy channels (to be excluded from analysis)
-bdchns = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_05-Jun-2023.txt'] ,'Format','auto') );
+bdchns = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_07-Jun-2023.txt'] ,'ReadVariableNames', false,'Format','auto') );
 
 % pre-specify variable to save clean power outcomes in
 % % % cleandatfr    = nan(length(subj_list), length(sessions), 30, 513, 600); % for tacs-EEG data
@@ -158,7 +163,8 @@ cleandatfr_o    = nan(length(subj_list), length(sessions), 30, 513, 120); %eyes-
 cleandatfr_c    = nan(length(subj_list), length(sessions), 30, 513, 120); %eyes-closed
 
 % Load EEG set
-fileName = [file_type{1} '642-2_CleanEEG.set'];
+fileno   = 4;
+fileName = [file_type{fileno} '642-2_CleanEEG.set'];
 EEG      = pop_loadset('filename', fileName, 'filepath', Path2EEGsets);
 
 for subj_i = 1:length(subj_list)
@@ -226,6 +232,8 @@ frqidx   = dsearchn(hz, [4  7]');
 % Average over selected channels and frequencies
 powplot = nan(length(subj_list), length(sessions));
 
+cleandatfr = cleandatfr_o;
+
 for subj_i = 1:length(subj_list)
     for sess_i = 1:length(sessions)
 
@@ -264,9 +272,11 @@ powtopoalpha = log10( squeeze( mean( mean( mean( mean( cleandatfr(:, :, :, alpha
 powtopotheta = log10( squeeze( mean( mean( mean( mean( cleandatfr(:, :, :, thetaidx(1):thetaidx(2), :) ,5,'omitnan') ,4,'omitnan') ,2,'omitnan') ,1,'omitnan') ) );
 powtopo5hz   = log10( squeeze( mean( mean( mean( mean( cleandatfr(:, :, :, frqidx(1):frqidx(2),     :) ,5,'omitnan') ,4,'omitnan') ,2,'omitnan') ,1,'omitnan') ) );
 
+powspec = log10( squeeze( mean( mean( mean( mean( cleandatfr(:, :, :, :,  :) ,5,'omitnan') ,3,'omitnan') ,2,'omitnan') ,1,'omitnan') ) );
+
 % Plot
 figure(2); colormap jet
-subplot(1,4,1); plot( hz, powspec )
+subplot(1,4,1); plot( hz(1:200), powspec(1:200) )
 subplot(1,4,2); topoplotIndie(powtopobeta,  EEG.chanlocs(1:30),'numcontour',0,'electrodes','numbers','shading','interp');
 title({'14 - 30 Hz'}); c = colorbar; c.Label.String = 'Power \muV^2'; set(gca,'clim',[-0.3 0.2]);
 subplot(1,4,3); topoplotIndie(powtopoalpha, EEG.chanlocs(1:30),'numcontour',0,'electrodes','numbers','shading','interp');
@@ -284,10 +294,11 @@ datfr_rso = importdata('datfr_rso_saved.mat');
 datfr_rsc = importdata('datfr_rsc_saved.mat');
 
 % Load the table with noisy channels (to be excluded from analysis)
-bdchns = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_14-Feb-2023.txt'] ,'Format','auto') );
+%%%%%% bdchns = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_14-Feb-2023.txt'] ,'Format','auto') );
+bdchns = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_07-Jun-2023.txt'] ,'ReadVariableNames', false,'Format','auto') );
 
 % Load EEG set
-fileName = [file_type{1} '642-2_CleanEEG.set'];
+fileName = [file_type{4} '642-2_CleanEEG.set'];
 EEG      = pop_loadset('filename', fileName, 'filepath', Path2EEGsets);
 
 % Select channels for. For theta activity: overall power is strongest over Fz and surrounding channels
@@ -304,7 +315,7 @@ powdat = nan(length(subj_list), length(sessions), 120); %eyes-open
 % Select frequencies
 frqidx   = dsearchn(hz, [4.75  5.25]');
 
-for subj_i = 11:length(subj_list)
+for subj_i = 1:length(subj_list)
     for sess_i = 1:length(sessions)
 
         % Remove noisy
@@ -328,7 +339,7 @@ for subj_i = 11:length(subj_list)
     end
 end
 
-filename='powdat_rso_5Hz_saved.mat';
+filename='powdat_rso_posttACS_5Hz_saved.mat';
 save(filename,'powdat', '-v6');
 
 
