@@ -124,8 +124,12 @@ for( subji in 1:length(subj_list)){
 
 
 # ------- Add resting-state to tACS-EEG data -----
-datlong.old <- datlong
-datlong     <- rbind(datlong,datlong_rso)
+datlong.old1 <- datlong
+datlong      <- rbind(datlong,datlong_rso)
+
+baseline    <- ddply(datlong_rso[datlong_rso$time==0,], c("subject","session"),summarise, basepow=mean(power,na.rm=TRUE))
+datlong.old <- merge(datlong.old1, baseline, c("subject","session"))
+
 
 
 # ------ Remove outliers and missings ------
@@ -224,10 +228,18 @@ plot(fit.gamma)
 
 # ------ tACS-EEG - Run the LMM ------
 
+# tACS-EEG full dataset, all vars, with baseline 5Hz power as predictor too
+lmm <- lmer( power ~ basepow * condition * session * block * epoch + (1|subject/session), data = datlong.old, control = lmerControl(optimizer="bobyqa"))
+tab_model(lmm) #, p.adjust = "fdr") 
+
+lmm0 <- lmer( power ~ basepow * condition * block  + (1|subject/session), data = datlong.old, control = lmerControl(optimizer="bobyqa"))
+tab_model(lmm0, p.adjust = "fdr") 
+summary(lmm0) 
+plot_model(lmm0, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","condition","basepow")) + ylab("power") + theme_bw() 
+
 # tACS-EEG full dataset, all vars
 lmm1 <- lmer( power ~ condition * session * block * epoch  + (1|subject/session), data = datlong.old, control = lmerControl(optimizer="bobyqa"))
 tab_model(lmm1) #, p.adjust = "fdr") 
-summary(lmm1) 
 plot_model(lmm1, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","epoch","condition")) + ylab("power") + theme_bw() 
 
 # tACS-EEG full dataset, no epoch
@@ -326,6 +338,53 @@ ggplot(plotdata, aes(x=blockphase, y=mean, group=condition, fill=condition)) +
   ylab("Spectral power") + xlab("block") + 
   scale_colour_manual(values=c("#999999","#28558f")) + scale_fill_manual(values=c("#999999","#28558f")) +
   facet_wrap( . ~ session)
+
+
+# --------- Plot with split on baseline 5 hz power --------
+plotdata.lowbasepow <- ddply(datlong.old[datlong.old$basepow < mean(baseline$basepow,na.rm=TRUE), ], 
+                  c("condition","blockphase","session"), 
+                  summarise,
+                  N    = sum(!is.na(power)),
+                  mean = mean(power, na.rm=TRUE),
+                  #  meanpred = mean(predvals, na.rm=TRUE),
+                  sd   = sd(power, na.rm=TRUE),
+                  se   = sd / sqrt(N) )
+plotdata.lowbasepow <- plotdata.lowbasepow[!is.na(plotdata.lowbasepow$condition),]
+
+lo <- ggplot(plotdata.lowbasepow, aes(x=blockphase, y=mean, group=condition, fill=condition)) +
+  geom_ribbon(aes(  ymin=mean-sd, ymax=mean+sd, fill=condition), alpha = .175) +
+  # geom_line(size = 0.5, color = "black", aes(x=blockphase, y=meanpred, group=condition, linetype=condition)) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.2, size = 0.3, position=position_dodge(0.01)) +
+  geom_line(size=0.7, aes(color=condition, linetype=condition)) + 
+  #ylim(c(-0.28,-0.18)) +
+  geom_point(size = 3, stroke = 1, aes(colour=condition, shape=condition)) +
+  ylab("Spectral power") + xlab("block") + 
+  scale_colour_manual(values=c("#999999","#28558f")) + scale_fill_manual(values=c("#999999","#28558f")) +
+  facet_wrap( . ~ session)
+
+plotdata.highbasepow <- ddply(datlong.old[datlong.old$basepow >= mean(baseline$basepow,na.rm=TRUE), ], 
+                             c("condition","blockphase","session"), 
+                             summarise,
+                             N    = sum(!is.na(power)),
+                             mean = mean(power, na.rm=TRUE),
+                             #  meanpred = mean(predvals, na.rm=TRUE),
+                             sd   = sd(power, na.rm=TRUE),
+                             se   = sd / sqrt(N) )
+plotdata.highbasepow <- plotdata.highbasepow[!is.na(plotdata.highbasepow$condition),]
+
+hi <- ggplot(plotdata.highbasepow, aes(x=blockphase, y=mean, group=condition, fill=condition)) +
+  geom_ribbon(aes(  ymin=mean-sd, ymax=mean+sd, fill=condition), alpha = .175) +
+  # geom_line(size = 0.5, color = "black", aes(x=blockphase, y=meanpred, group=condition, linetype=condition)) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.2, size = 0.3, position=position_dodge(0.01)) +
+  geom_line(size=0.7, aes(color=condition, linetype=condition)) + 
+  #ylim(c(-0.28,-0.18)) +
+  geom_point(size = 3, stroke = 1, aes(colour=condition, shape=condition)) +
+  ylab("Spectral power") + xlab("block") + 
+  scale_colour_manual(values=c("#999999","#28558f")) + scale_fill_manual(values=c("#999999","#28558f")) +
+  facet_wrap( . ~ session)
+
+ggarrange(ncol = 2, nrow = 1, lo, hi)
+
 
 
 # ---- with individual theta freq eucledian distance to 5 Hz -----
