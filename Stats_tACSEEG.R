@@ -47,7 +47,8 @@ dat_rso_post  <- dat_rso_post[[1]]
 # # add "euclidean distance" of individial theta (IAF-4.5) to 5Hz stim freq
 # datlong_iaf$ud  <- abs(5 - (datlong_iaf$IAF-4.5) )
 
-# Put data in long format
+
+# --------- Put data in long format ---------
 datlong           <- reshape2::melt(dat)
 colnames(datlong) <- c("subject","session","trial","power")
 datlong$time      <- 1
@@ -231,9 +232,11 @@ plot(fit.gamma)
 # tACS-EEG full dataset, all vars, with baseline 5Hz power as predictor too
 lmm <- lmer( power ~ basepow * condition * session * block * epoch + (1|subject/session), data = datlong.old, control = lmerControl(optimizer="bobyqa"))
 tab_model(lmm) #, p.adjust = "fdr") 
+plot_model(lmm, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","condition","epoch")) + ylab("power") + theme_bw() 
+plot_model(lmm, type="pred", title="tACS-EEG model - 5Hz power", terms=c("epoch","condition","block")) + ylab("power") + theme_bw() 
 
 lmm0 <- lmer( power ~ basepow * condition * session * block  + (1|subject/session), data = datlong.old, control = lmerControl(optimizer="bobyqa"))
-tab_model(lmm0, p.adjust = "fdr") 
+tab_model(lmm0) #, p.adjust = "fdr") 
 summary(lmm0) 
 plot_model(lmm0, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","condition","basepow")) + ylab("power") + theme_bw() 
 
