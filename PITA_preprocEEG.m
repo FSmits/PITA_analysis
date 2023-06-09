@@ -75,8 +75,8 @@ cd('/Users/fsmits2/Downloads/eeglab2022.1')
 [ALLEEG, EEG, CURRENTSET, ALLCOM] = eeglab;
 
 % set paths to data
-Path2EEGbdf  = '/Users/fsmits2/Downloads/1 EEG data tacs-eeg/';
-Path2EEGsets = '/Users/fsmits2/Downloads/1 EEG data tacs-eeg/post-tacs r-s processed';
+Path2EEGbdf  = '/Volumes/HER/onderzoeksarchief/22-000_PITA_BS/F_DataAnalysis/Data EEG/3 Memory task/';
+Path2EEGsets = '/Users/fsmits2/Downloads/1 EEG data encoding/Encoding pre-processed';
 path2save    = '/Users/fsmits2/Documents/PITA_analysis';
 path2scripts = '/Users/fsmits2/MATLAB/Projects/PITA_analysissandbox';
 
@@ -117,6 +117,27 @@ start_EEG       = 7;
 stop_EEG        = 8;
 post_tACS_EEG   = 9;
 
+% Memory task encoding:
+Resume              = 253;
+ITIOnset            = 20; % Fixation onset
+ITIOffset           = 21;
+StimContextOnset    = 22; % Onset context stimulus
+StimFaceOnset       = 23; % Onset face stimulus
+StimOffset          = 24; % Offset context + face stimulus
+
+% Memory task retrieval:
+con_StimOnset       = 25; % Onset context + face stimulus; congruent trail
+incon_StimOnset     = 26; % Onset context + face stimulus; incongruent trail
+new_StimOnset       = 27; % Onset context + face stimulus; new trial
+StimOffset          = 28; % Offset context + face stimulus
+StimOld             = 29; % this combinations has been presented before
+StimNew             = 30; % this combinations has not been presented before
+Hit_EEG             = 31; % Correctly recognizing something as 'old'
+FA_EEG              = 32; % Incorrectly recognizing something as 'new'
+miss_EEG            = 33; % incorrectly recognizing old as new
+corej_EEG           = 34; % correctly recognizing new as new
+
+
 % %%% For tACS-EEG data:
 % % Initiate time/period-related triggers
 % secs      = 30; % 30 seconden data na elke tACS stimulatie
@@ -126,10 +147,10 @@ post_tACS_EEG   = 9;
 % trigs     = trig_base + stim_mat; % Trigger names are: #stimulation as integer, #second of data following that stimulation as decimal
 
 % Which task (file type) you want to analyze?
-fileno = 3;
+fileno = 2;
 
 % Loop over files
-for subj_i = 31:length(subj_list)
+for subj_i = 39:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nStart processing subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
@@ -185,51 +206,51 @@ for subj_i = 31:length(subj_list)
 %             EEG = pop_editeventvals(EEG,'insert',{ 2 ,[],[],[],[]},'changefield',{ 2 ,'type','2' }, 'changefield',{ 2 ,'edftype','2' }, 'changefield',{ 2 ,'latency', EEG.event(3).latency/EEG.srate-1 }); % latency of events (EEG.event.latency) is defined in data points, not in time. But when you want to change it, you need to define in seconds.
 %         end
 
-        %%% For post-tACS resting-state data:
-        if fileno==3 %when post-tACS resting-state is inside tACS-EEG bdf datatset
-            rs_begin = [find(strcmpi( {EEG.event.type}, '254' )) find(strcmpi( {EEG.event.type}, '510' ))];
-            if subj_list(subj_i)==681 && sess_i==2
-                rs_begin = rs_begin(1);
-            end
-            if length(rs_begin)>1 || isempty(rs_begin)
-                fprintf('****\nNone or too many resting-state start triggers in subject %i session %i\n', subj_list(subj_i), sessions(sess_i));
-                return
-            end
-            EEG = eeg_eegrej(EEG, [0,  EEG.event(rs_begin).latency]); % remove data during tACS
-            [ALLEEG, EEG, CURRENTSET] = eeg_store(ALLEEG, EEG); % store changes
-        end
-
-        % Delete double events
-        if subj_list(subj_i)==600 && sess_i==1 && fileno==4
-            EEG = pop_editeventvals(EEG,'delete', [9]);
-        end
-
-        % find or create trigger for resting-state onset  eyes-open & eyes-closed  (original codes = '1' / '3'. Other possibile codes = ':EOG (blinks, fast, large amplitude)' / ':EMG/Muscle'.)
-        open_begin  = sort([find(strcmpi( {EEG.event.type}, '1' )), ...
-            find(strcmpi( {EEG.event.type}, ':EOG (blinks, fast, large amplitude)' )) ]);
-        close_begin = sort([find(strcmpi( {EEG.event.type}, '3' )), ...
-            find(strcmpi( {EEG.event.type}, ':EMG/Muscle' )) ]);     
-
-        % find trigger for eyes-open & eyes-closed resting-state offset  (original code = '2' / '4'. Other possibile codes = ':ECG' / ':Movement'.)
-        open_end  = sort([find(strcmpi( {EEG.event.type}, '2' )), ...
-            find(strcmpi( {EEG.event.type}, ':ECG' )) ]);
-        close_end = sort([find(strcmpi( {EEG.event.type}, '4' )), ...
-            find(strcmpi( {EEG.event.type}, ':Movement' )) ]);
-
-        % re-code to resting-state onsets and offsets
-        for trig_i = 1:length(open_begin)
-            EEG = pop_editeventvals(EEG,'changefield', {open_begin(trig_i)  'type' 'EyesOpenOnset'});
-        end
-        for trig_i = 1:length(open_end)
-            EEG = pop_editeventvals(EEG,'changefield', {open_end(trig_i)    'type' 'EyesOpenOffset'});
-        end
-        for trig_i = 1:length(close_begin)
-            EEG = pop_editeventvals(EEG,'changefield', {close_begin(trig_i) 'type' 'EyesClosedOnset'});
-        end
-        for trig_i = 1:length(close_end)
-            EEG = pop_editeventvals(EEG,'changefield', {close_end(trig_i)   'type' 'EyesClosedOffset'});
-        end
-  
+% % % %         %%% For post-tACS resting-state data:
+% % % %         if fileno==3 %when post-tACS resting-state is inside tACS-EEG bdf datatset
+% % % %             rs_begin = [find(strcmpi( {EEG.event.type}, '254' )) find(strcmpi( {EEG.event.type}, '510' ))];
+% % % %             if subj_list(subj_i)==681 && sess_i==2
+% % % %                 rs_begin = rs_begin(1);
+% % % %             end
+% % % %             if length(rs_begin)>1 || isempty(rs_begin)
+% % % %                 fprintf('****\nNone or too many resting-state start triggers in subject %i session %i\n', subj_list(subj_i), sessions(sess_i));
+% % % %                 return
+% % % %             end
+% % % %             EEG = eeg_eegrej(EEG, [0,  EEG.event(rs_begin).latency]); % remove data during tACS
+% % % %             [ALLEEG, EEG, CURRENTSET] = eeg_store(ALLEEG, EEG); % store changes
+% % % %         end
+% % % % 
+% % % %         % Delete double events
+% % % %         if subj_list(subj_i)==600 && sess_i==1 && fileno==4
+% % % %             EEG = pop_editeventvals(EEG,'delete', [9]);
+% % % %         end
+% % % % 
+% % % %         % find or create trigger for resting-state onset  eyes-open & eyes-closed  (original codes = '1' / '3'. Other possibile codes = ':EOG (blinks, fast, large amplitude)' / ':EMG/Muscle'.)
+% % % %         open_begin  = sort([find(strcmpi( {EEG.event.type}, '1' )), ...
+% % % %             find(strcmpi( {EEG.event.type}, ':EOG (blinks, fast, large amplitude)' )) ]);
+% % % %         close_begin = sort([find(strcmpi( {EEG.event.type}, '3' )), ...
+% % % %             find(strcmpi( {EEG.event.type}, ':EMG/Muscle' )) ]);     
+% % % % 
+% % % %         % find trigger for eyes-open & eyes-closed resting-state offset  (original code = '2' / '4'. Other possibile codes = ':ECG' / ':Movement'.)
+% % % %         open_end  = sort([find(strcmpi( {EEG.event.type}, '2' )), ...
+% % % %             find(strcmpi( {EEG.event.type}, ':ECG' )) ]);
+% % % %         close_end = sort([find(strcmpi( {EEG.event.type}, '4' )), ...
+% % % %             find(strcmpi( {EEG.event.type}, ':Movement' )) ]);
+% % % % 
+% % % %         % re-code to resting-state onsets and offsets
+% % % %         for trig_i = 1:length(open_begin)
+% % % %             EEG = pop_editeventvals(EEG,'changefield', {open_begin(trig_i)  'type' 'EyesOpenOnset'});
+% % % %         end
+% % % %         for trig_i = 1:length(open_end)
+% % % %             EEG = pop_editeventvals(EEG,'changefield', {open_end(trig_i)    'type' 'EyesOpenOffset'});
+% % % %         end
+% % % %         for trig_i = 1:length(close_begin)
+% % % %             EEG = pop_editeventvals(EEG,'changefield', {close_begin(trig_i) 'type' 'EyesClosedOnset'});
+% % % %         end
+% % % %         for trig_i = 1:length(close_end)
+% % % %             EEG = pop_editeventvals(EEG,'changefield', {close_end(trig_i)   'type' 'EyesClosedOffset'});
+% % % %         end
+% % % %   
 
 % % %         %%% For tACS-EEG data:
 % % %         % find or create trigger for tACS onset   (original code = '5'. Other possibile codes = '8' , ':Failing electrode' , ':breathing'.)
@@ -319,7 +340,7 @@ end
 
 fileno = 4;
 
-for subj_i = 11:length(subj_list)
+for subj_i = 1:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nStart pre-processing subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
