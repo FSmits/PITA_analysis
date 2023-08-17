@@ -39,7 +39,7 @@ close all
 cd('/Users/fsmits2/Downloads/eeglab2022.1')
 [ALLEEG, EEG, CURRENTSET, ALLCOM] = eeglab;
 
-cd('/Users/fsmits2/Documents/PITA_analysis'); % return to PITA analysis folder
+% cd('/Users/fsmits2/Documents/PITA_analysis'); % return to PITA analysis folder
 
 % set paths to data
 Path2EEGsets = '/Users/fsmits2/Downloads/1 EEG data tacs-eeg/post-tacs r-s processed/';

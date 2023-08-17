@@ -96,7 +96,8 @@ datlong$epoch  <- rep(1:29, times=20, each=length(subj_list)*2)     # repeat sam
 # reduce data dimensions for statistical model
 datlong$blockphase <- rep( 1:5,                           times=1,  each=length(subj_list)*2*29*4) # repeat same single number for all subjects, 2 sessions, 29 trials and 4 "phases" per block
 datlong$epochphase <- rep( c(rep(1:4,times=1,each=7), 4), times=20, each=length(subj_list)*2)      # create number series of 4 "phases" in the 29 epochs. Then repeat same number series for all subjects and 2 sessions. Then repeat for each block (20x)
-datlong_rso$blockphase <- 0
+datlong_rso$blockphase[datlong_rso$time==0] <- 0
+datlong_rso$blockphase[datlong_rso$time==2] <- 6
 datlong_rso$epochphase <- 0
 
 
@@ -229,63 +230,44 @@ plot(fit.gamma)
 
 # ------ tACS-EEG - Run the LMM ------
 
-# tACS-EEG full dataset, all vars, with baseline 5Hz power as predictor too
-lmm <- lmer( power ~ basepow * condition * session * block * epoch + (1|subject/session), data = datlong.old, control = lmerControl(optimizer="bobyqa"))
-tab_model(lmm) #, p.adjust = "fdr") 
-plot_model(lmm, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","condition","epoch")) + ylab("power") + theme_bw() 
-plot_model(lmm, type="pred", title="tACS-EEG model - 5Hz power", terms=c("epoch","condition","block")) + ylab("power") + theme_bw() 
-
-lmm0 <- lmer( power ~ basepow * condition * session * block  + (1|subject/session), data = datlong.old, control = lmerControl(optimizer="bobyqa"))
-tab_model(lmm0) #, p.adjust = "fdr") 
-summary(lmm0) 
-plot_model(lmm0, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","condition","basepow")) + ylab("power") + theme_bw() 
-
 # tACS-EEG full dataset, all vars
 lmm1 <- lmer( power ~ condition * session * block * epoch  + (1|subject/session), data = datlong.old, control = lmerControl(optimizer="bobyqa"))
 tab_model(lmm1) #, p.adjust = "fdr") 
-plot_model(lmm1, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","epoch","condition")) + ylab("power") + theme_bw() 
+plot_model(lmm1, type="pred", title="tACS-EEG model - 5Hz power", terms=c("condition","block")) + ylab("power") + theme_bw() 
+plot_model(lmm1, type="pred", title="tACS-EEG model - 5Hz power", terms=c("epoch","condition","block")) + ylab("power") + theme_bw() 
+
+# tACS-EEG full dataset, all vars, with baseline 5Hz power as predictor too
+lmm <- lmer( power ~ basepow * condition * session * block * epoch + (1|subject/session), data = datlong.old, control = lmerControl(optimizer="bobyqa"))
+tab_model(lmm) #, p.adjust = "fdr") 
+plot_model(lmm, type="pred", title="tACS-EEG model - 5Hz power", terms=c("epoch","condition","block")) + ylab("power") + theme_bw() 
+
 
 # tACS-EEG full dataset, no epoch
 lmm2 <- lmer( power ~ condition * session * block + (1|subject/session), data = datlong.old, control = lmerControl(optimizer="bobyqa"))
 tab_model(lmm2) #, p.adjust = "fdr") 
 plot_model(lmm2, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","condition","session")) + ylab("power") + theme_bw() 
 
-# with avg dataset meanpower and block^2
-lmm3 <- lmer( meanpower ~ condition * session * poly(block,2) + (1|subject/session), data = datavg)
-tab_model(lmm3) #, p.adjust = "fdr") 
-plot_model(lmm3, type="pred", title="Avg rest+tACS-EEG model - 5Hz power", terms=c("block","condition","session")) + ylab("power") + theme_bw() 
+lmm0 <- lmer( power ~ basepow * condition * session * block  + (1|subject/session), data = datlong.old, control = lmerControl(optimizer="bobyqa"))
+tab_model(lmm0) #, p.adjust = "fdr") 
+plot_model(lmm0, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","condition","session")) + ylab("power") + theme_bw() 
 
-# with avg dataset meanpower and time^2
-lmm4 <- lmer( meanpower ~ condition  * poly(time,2) + (1|subject/session), data = datavg)
-tab_model(lmm4) #, p.adjust = "fdr") 
-plot_model(lmm4, type="pred", title="Avg rest+tACS-EEG model - 5Hz power", terms=c("time","condition")) + ylab("power") + theme_bw() 
 
-# with avg dataset SDpower and block^2
-lmm5 <- lmer( SDpower ~ condition * session * poly(block,2) + (1|subject/session), data = datavg)
+
+# with avg dataset SDpower
+lmm5 <- lmer( SDpower ~ condition * session * block * time + (1|subject/session), data = datavg)
 tab_model(lmm5) #, p.adjust = "fdr") 
-plot_model(lmm5, type="pred", title="SD rest+tACS-EEG model - 5Hz power", terms=c("block","condition","session")) + ylab("SD power") + theme_bw() 
-
-# with avg dataset SDpower and time^2
-lmm6 <- lmer( SDpower ~ condition  * poly(time,2) + (1|subject/session), data = datavg)
-tab_model(lmm6) #, p.adjust = "fdr") 
-plot_model(lmm6, type="pred", title="Avg rest+tACS-EEG model - 5Hz power", terms=c("time","condition","session")) + ylab("power") + theme_bw() 
-
-# with avg dataset but tACS-EEG blcoks only SDpower and block^2
-datavgtacs <- datavg[datavg$block>0 & datavg$block<21, ]
-lmm7 <- lmer( SDpower ~ condition * session * block + (1|subject/session), data = datavgtacs)
-tab_model(lmm7) #, p.adjust = "fdr") 
-plot_model(lmm7, type="pred", title="SD rest+tACS-EEG model - 5Hz power", terms=c("block","condition","session")) + ylab("SD power") + theme_bw() 
+plot_model(lmm5, type="pred", title="SD rest+tACS-EEG model - 5Hz power", terms=c("time","condition","session")) + ylab("SD power") + theme_bw() 
 
 
 
 # ------ resting-state EEG - Run the LMM ------
 
 lmm_rso <- lmer( power ~ condition * session * time + (1|subject/session), data = datlong_rso)
-tab_model(lmm_rso, p.adjust = "fdr") 
+tab_model(lmm_rso) #, p.adjust = "fdr") 
 summary(lmm_rso) 
 
 # Plot predicted values
-plot_model(lmm_rso, type="pred", title="5Hz power", terms=c("time","session","condition")) + ylab("mean 5Hz power") + theme_bw() 
+plot_model(lmm_rso, type="pred", title="5Hz power", terms=c("time","condition","session")) + ylab("mean 5Hz power") + theme_bw() 
 
 #Plot predicted mean values
 plot_model(lmm_rso, type="pred", title="5Hz power", terms=c("time","condition")) + ylab("mean 5Hz power") + theme_bw()   # + scale_colour_manual(values=c("#e77e3a","#0F3EAA")) 
@@ -331,16 +313,37 @@ plotdata <- ddply(datlong,
                   sd   = sd(power, na.rm=TRUE),
                   se   = sd / sqrt(N) )
 
-ggplot(plotdata, aes(x=blockphase, y=mean, group=condition, fill=condition)) +
-  geom_ribbon(aes(  ymin=mean-sd, ymax=mean+sd, fill=condition), alpha = .175) +
+all <- ggplot(plotdata, aes(x=blockphase, y=mean, group=condition, fill=condition)) +
+  # geom_ribbon(aes(  ymin=mean-sd, ymax=mean+sd, fill=condition), alpha = .175) +
   # geom_line(size = 0.5, color = "black", aes(x=blockphase, y=meanpred, group=condition, linetype=condition)) +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.2, size = 0.3, position=position_dodge(0.01)) +
-  geom_line(size=0.7, aes(color=condition, linetype=condition)) + 
-  #ylim(c(-0.28,-0.18)) +
+  geom_line(size=0.7, aes(color=condition)) + 
+  ylim(c(0.3,0.65)) +
   geom_point(size = 3, stroke = 1, aes(colour=condition, shape=condition)) +
-  ylab("Spectral power") + xlab("block") + 
+  ylab("Spectral power") + xlab("Phase") + ggtitle("All ppn") +
   scale_colour_manual(values=c("#999999","#28558f")) + scale_fill_manual(values=c("#999999","#28558f")) +
   facet_wrap( . ~ session)
+
+
+plotdata2 <- ddply(datlong, 
+                  c("condition","block","session","epoch"), 
+                  summarise,
+                  N    = sum(!is.na(power)),
+                  mean = mean(power, na.rm=TRUE),
+                  #  meanpred = mean(predvals, na.rm=TRUE),
+                  sd   = sd(power, na.rm=TRUE),
+                  se   = sd / sqrt(N) )
+
+ggplot(plotdata2, aes(x=epoch, y=mean, group=condition, fill=condition)) +
+  # geom_ribbon(aes(  ymin=mean-sd, ymax=mean+sd, fill=condition), alpha = .175) +
+  # geom_line(size = 0.5, color = "black", aes(x=blockphase, y=meanpred, group=condition, linetype=condition)) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.2, size = 0.3, position=position_dodge(0.01)) +
+  geom_line(size=0.7, aes(color=condition)) + 
+  ylim(c(0.3,0.65)) +
+  geom_point(size = 3, stroke = 1, aes(colour=condition, shape=condition)) +
+  ylab("Spectral power") + xlab("Phase") + ggtitle("All ppn") +
+  scale_colour_manual(values=c("#999999","#28558f")) + scale_fill_manual(values=c("#999999","#28558f")) +
+  facet_wrap( . ~ block)
 
 
 # --------- Plot with split on baseline 5 hz power --------
@@ -355,13 +358,13 @@ plotdata.lowbasepow <- ddply(datlong.old[datlong.old$basepow < mean(baseline$bas
 plotdata.lowbasepow <- plotdata.lowbasepow[!is.na(plotdata.lowbasepow$condition),]
 
 lo <- ggplot(plotdata.lowbasepow, aes(x=blockphase, y=mean, group=condition, fill=condition)) +
-  geom_ribbon(aes(  ymin=mean-sd, ymax=mean+sd, fill=condition), alpha = .175) +
+  # geom_ribbon(aes(  ymin=mean-sd, ymax=mean+sd, fill=condition), alpha = .175) +
   # geom_line(size = 0.5, color = "black", aes(x=blockphase, y=meanpred, group=condition, linetype=condition)) +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.2, size = 0.3, position=position_dodge(0.01)) +
-  geom_line(size=0.7, aes(color=condition, linetype=condition)) + 
-  #ylim(c(-0.28,-0.18)) +
-  geom_point(size = 2, stroke = 1, aes(colour=condition, shape=condition)) +
-  ylab("Spectral power") + xlab("block") + ylim(-.1, 1) +
+  geom_line(size=0.7, aes(color=condition)) + 
+  ylim(c(0.3,0.65)) +
+  geom_point(size = 3, stroke = 1, aes(colour=condition, shape=condition)) +
+  ylab("Spectral power") + xlab("Phase") + ggtitle("High baseline 5 Hz pow") +
   scale_colour_manual(values=c("#999999","#28558f")) + scale_fill_manual(values=c("#999999","#28558f")) +
   facet_wrap( . ~ session)
 
@@ -376,17 +379,17 @@ plotdata.highbasepow <- ddply(datlong.old[datlong.old$basepow >= mean(baseline$b
 plotdata.highbasepow <- plotdata.highbasepow[!is.na(plotdata.highbasepow$condition),]
 
 hi <- ggplot(plotdata.highbasepow, aes(x=blockphase, y=mean, group=condition, fill=condition)) +
-  geom_ribbon(aes(  ymin=mean-sd, ymax=mean+sd, fill=condition), alpha = .175) +
+  # geom_ribbon(aes(  ymin=mean-sd, ymax=mean+sd, fill=condition), alpha = .175) +
   # geom_line(size = 0.5, color = "black", aes(x=blockphase, y=meanpred, group=condition, linetype=condition)) +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.2, size = 0.3, position=position_dodge(0.01)) +
-  geom_line(size=0.7, aes(color=condition, linetype=condition)) + 
-  #ylim(c(-0.28,-0.18)) +
-  geom_point(size = 2, stroke = 1, aes(colour=condition, shape=condition)) +
-  ylab("Spectral power") + xlab("block") + ylim(-.1, 1) +
+  geom_line(size=0.7, aes(color=condition)) + 
+  ylim(c(0.3,0.65)) +
+  geom_point(size = 3, stroke = 1, aes(colour=condition, shape=condition)) +
+  ylab("Spectral power") + xlab("Phase") + ggtitle("High baseline 5 Hz pow") +
   scale_colour_manual(values=c("#999999","#28558f")) + scale_fill_manual(values=c("#999999","#28558f")) +
   facet_wrap( . ~ session)
 
-ggarrange(ncol = 2, nrow = 1, lo, hi)
+ggarrange(ncol = 3, nrow = 1, all, lo, hi)
 
 
 
@@ -708,3 +711,26 @@ ggplot(plotdata, aes(x=epoch, y=mean, group=condition, fill=condition)) +
 # ---- old -----
 # cuts                   <- seq(from = 1, to = 120, by = 29)
 # epochnrs               <- c( 1:29, cuts[2]:(cuts[3]-1), cuts[3]:(cuts[4]-1), cuts[4]:(cuts[5]-1), cuts[5]:120)
+
+# 
+# # with avg dataset meanpower and block^2
+# lmm3 <- lmer( meanpower ~ condition * session * poly(block,2) + (1|subject/session), data = datavg)
+# tab_model(lmm3) #, p.adjust = "fdr") 
+# plot_model(lmm3, type="pred", title="Avg rest+tACS-EEG model - 5Hz power", terms=c("block","condition","session")) + ylab("power") + theme_bw() 
+# 
+# # with avg dataset meanpower and time^2
+# lmm4 <- lmer( meanpower ~ condition  * poly(time,2) + (1|subject/session), data = datavg)
+# tab_model(lmm4) #, p.adjust = "fdr") 
+# plot_model(lmm4, type="pred", title="Avg rest+tACS-EEG model - 5Hz power", terms=c("time","condition")) + ylab("power") + theme_bw() 
+#
+# # with avg dataset SDpower and time^2
+# lmm6 <- lmer( SDpower ~ condition  * poly(time,2) + (1|subject/session), data = datavg)
+# tab_model(lmm6) #, p.adjust = "fdr") 
+# plot_model(lmm6, type="pred", title="Avg rest+tACS-EEG model - 5Hz power", terms=c("time","condition","session")) + ylab("power") + theme_bw() 
+# 
+# # with avg dataset but tACS-EEG blcoks only SDpower and block^2
+# datavgtacs <- datavg[datavg$block>0 & datavg$block<21, ]
+# lmm7 <- lmer( SDpower ~ condition * session * block + (1|subject/session), data = datavgtacs)
+# tab_model(lmm7) #, p.adjust = "fdr") 
+# plot_model(lmm7, type="pred", title="SD rest+tACS-EEG model - 5Hz power", terms=c("block","condition","session")) + ylab("SD power") + theme_bw() 
+# 

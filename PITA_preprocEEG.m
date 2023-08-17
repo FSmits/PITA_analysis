@@ -588,15 +588,15 @@ bdchns(:,1)   = num2cell(subj_list');
 % intrp_chans      = cell(length(subj_list),3);
 % intrp_chans(:,1) = num2cell(subj_list');
 
-rej_epocs     = table2array( readtable( [Path2EEGsets '/Overview_rejected_epochs_' '08-May-2023' '.txt'] ) ); %char(datetime('today'))
-ICAcomps      = table2cell(  readtable( [Path2EEGsets '/Overview_ICAcomps_'        '08-May-2023' '.txt'] ) );
-bdchns        = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_'     '08-May-2023' '.txt'] ) ); %,'Format','auto') );
+rej_epocs     = table2array( readtable( [Path2EEGsets '/Overview_rejected_epochs_' file_type{fileno} '16-Jun-2023' '.txt'] ) ); %char(datetime('today'))
+ICAcomps      = table2cell(  readtable( [Path2EEGsets '/Overview_ICAcomps_'        file_type{fileno} '16-Jun-2023' '.txt'] ) );
+bdchns        = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_'     file_type{fileno} '16-Jun-2023' '.txt'] ) ); %,'Format','auto') );
 % intrp_chans   = table2cell(  readtable( [Path2EEGsets '/Overview_interpolated_channels' char(datetime('today')) '.txt'] ) ); %char(datetime('yesterday')) '.txt'] ) ); %
 
 fileno = 2;
 
 % Loop over files
-for subj_i = 1:length(subj_list)
+for subj_i = 10:length(subj_list)
     for sess_i = 1:length(sessions)
 
         fprintf('\n****\nLoad subject %i session %i\n****\n\n', subj_list(subj_i), sessions(sess_i));
@@ -744,9 +744,9 @@ for subj_i = 1:length(subj_list)
         SaveName = [file_type{fileno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG.set'];
         EEG      = pop_saveset( EEG, 'filename',SaveName,'filepath', Path2EEGsets );
         cd(path2save);
-        writecell(  ICAcomps,   [Path2EEGsets '/Overview_ICAcomps_'        char(datetime('today')) '.txt'], 'Delimiter',',');
-        writecell(  bdchns,     [Path2EEGsets '/Overview_badchannels_'     char(datetime('today')) '.txt'], 'Delimiter',',');
-        writematrix(rej_epocs,  [Path2EEGsets '/Overview_rejected_epochs_' char(datetime('today')) '.txt'], 'Delimiter',',');
+        writecell(  ICAcomps,   [Path2EEGsets '/Overview_ICAcomps_'        file_type{fileno} char(datetime('today')) '.txt'], 'Delimiter',',');
+        writecell(  bdchns,     [Path2EEGsets '/Overview_badchannels_'     file_type{fileno} char(datetime('today')) '.txt'], 'Delimiter',',');
+        writematrix(rej_epocs,  [Path2EEGsets '/Overview_rejected_epochs_' file_type{fileno} char(datetime('today')) '.txt'], 'Delimiter',',');
 
         m2 = 0;
         while m2 == 0
