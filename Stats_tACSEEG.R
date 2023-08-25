@@ -17,7 +17,7 @@ rm(list=ls())
 # ------ Load the data ------
 subj_list <- c(669,	557, 363,	638, 989,	383, 502,	733, 442,	575, 710,	262,
                752, 227,	565,	362, 600,	121, 319, 923, 915,	298, 202,	692, 275,
-               508, 291,	803,	755, 681,	876, 134,	559, 818,	601, 524,	883, 193, 642)
+               508, 291,	803,	755, 681,	876, 134,	559, 818,	601, 524,	883, 193, 642) #Copied from Matlab
 
 path2file <- "/Users/fsmits2/Documents/PITA_analysis/"
 filename  <- "powdat_5Hz_saved.mat"
@@ -26,174 +26,132 @@ filepath  <- paste( path2file, filename, sep="" )
 dat <- readMat( filepath ) # for practice (empty dataframe):  dat <- array(data = NA, dim = c(39,2,600))
 dat <- dat[[1]]
 
-# add pre- and post-tACS resting-state data
-filename2a    <- "powdat_rso_pretACS_5Hz_saved.mat"
-filepath2a    <- paste( path2file, filename2a, sep="" )
-dat_rso_pre   <- readMat( filepath2a ) # for practice (empty dataframe):  dat <- array(data = NA, dim = c(39,2,600))
-dat_rso_pre   <- dat_rso_pre[[1]]
-
-filename2b    <- "powdat_rso_posttACS_5Hz_saved.mat"
-filepath2b    <- paste( path2file, filename2b, sep="" )
-dat_rso_post  <- readMat( filepath2b ) # for practice (empty dataframe):  dat <- array(data = NA, dim = c(39,2,600))
-dat_rso_post  <- dat_rso_post[[1]]
-
 # # add pre-tACS resting-state individual alpha peak (IAF)
-# filename3       <- "maxfrq_c_saved.mat"
-# filepath3       <- paste( path2file, filename3, sep="" )
-# dat_iaf         <- readMat( filepath3 ) # for practice (empty dataframe):  dat <- array(data = NA, dim = c(39,2,600))
-# dat_iaf         <- dat_iaf[[1]]
-# datlong_iaf     <- reshape2::melt(dat_iaf)
-# colnames(datlong_iaf) <- c("subject","session","IAF")
-# # add "euclidean distance" of individial theta (IAF-4.5) to 5Hz stim freq
-# datlong_iaf$ud  <- abs(5 - (datlong_iaf$IAF-4.5) )
+# filename3 <- "maxfrq_c_saved.mat";  filepath3       <- paste( path2file, filename3, sep="" )
+# dat_iaf <- readMat( filepath3 ) # for practice (empty dataframe):  dat <- array(data = NA, dim = c(39,2,600));  dat_iaf <- dat_iaf[[1]]
+# datlong_iaf <- reshape2::melt(dat_iaf);  colnames(datlong_iaf) <- c("subject","session","IAF")
 
 
 # --------- Put data in long format ---------
 datlong           <- reshape2::melt(dat)
 colnames(datlong) <- c("subject","session","trial","power")
-datlong$time      <- 1
 
-datlong_rso_pre             <- reshape2::melt(dat_rso_pre)
-colnames(datlong_rso_pre)   <- c("subject","session","trial","power")
-datlong_rso_pre$time        <- 0
-datlong_rso_post            <- reshape2::melt(dat_rso_post)
-colnames(datlong_rso_post)  <- c("subject","session","trial","power")
-datlong_rso_post$time       <- 2
-datlong_rso_pre$block       <- 0  # pre-tACS resting-state is coded as "block 0"
-datlong_rso_post$block      <- 21 # post-tACS resting-state is coded as "block 21" (tACS-EEG has 20 blocks. here + 1)
-
-# merge resting state pre- and post-tacs:
-# datlong_rso <- merge(datlong_rso_pre, datlong_rso_post, by=c("subject","session","trial") )
-datlong_rso       <- rbind(datlong_rso_pre, datlong_rso_post)
-datlong_rso$epoch <- rep( c(rep(1:29,times=4),1:4), times=1, each=length(subj_list)*2)
+# Change Matlab's 'NaN' to R's 'NA' & Remove 'empty' trials (max no. recorded trials is 580, so trials>580 are all NA)
+datlong$power[is.nan(datlong$power)] <- NA
+datlong <- datlong[!datlong$trial>580, ] 
 
 
-# ----- Add subject info -----
+# ------- Add beta power data and calculate theta/beta (or: 5hz/beta) ratio -------
+filename.beta  <- "powdat_beta_saved.mat"
+filepath.beta  <- paste( path2file, filename.beta, sep="" )
+dat.beta       <- readMat( filepath.beta ) # for practice (empty dataframe):  dat <- array(data = NA, dim = c(39,2,600))
+dat.beta       <- dat.beta[[1]]
+datlong.beta   <- reshape2::melt(dat.beta)
+colnames(datlong.beta) <- c("subject","session","trial","power")
+datlong.beta$power[is.nan(datlong.beta$power)] <- NA
+
+# merge
+datlong.oud <- datlong
+datlong     <- merge(datlong, datlong.beta, by=c("subject","session","trial"))
+colnames(datlong) <- c("subject", "session", "trial", "power", "power.beta")
+datlong$ratio     <- abs(datlong$power/datlong$power.beta)
+
+
+# ----- Add subject and condition info -----
 # Replace subject index numbers by real Subject IDs
-subj_vec  <- 1:length(subj_list)
-subj_mat  <- rbind(subj_list,subj_vec)
-for( subji in 1:length(subj_list)){
-  idx     <- which(datlong$subject     == subj_mat[2,subji])
-  idx_rso <- which(datlong_rso$subject == subj_mat[2,subji])
-  datlong$subject[idx]         <- subj_mat[1,subji]
-  datlong_rso$subject[idx_rso] <- subj_mat[1,subji]
-#  idx_iaf      <- which(datlong_iaf$subject == subj_mat[2,subji])
-#  datlong_iaf$subject[idx_iaf] <- subj_mat[1,subji]
-}
+subj_vec           <- 1:length(subj_list)
+subj_mat           <- t(rbind(subj_list,subj_vec))
+colnames(subj_mat) <- c("subjectID","subject")
+datlong            <- merge(datlong, subj_mat, by="subject")
 
-# Change Matlab's 'NaN' to R's 'NA'
-datlong$power[is.nan(datlong$power)]         <- NA
-datlong_rso$power[is.nan(datlong_rso$power)] <- NA
-
-# Remove 'empty' trials (max no. recorded trials is 580, so trials>580 are all NA)
-datlong   <- datlong[!datlong$trial>580, ] 
+# In the random allocation deblinded file, conditions codes: 0=sham tACS, 1=real 5Hz tACS
+conditions <- read.table(paste(path2file,'Random_allocation_log_PITA_deblinded_matlab.csv',sep=""), header=FALSE, sep=",")
+colnames(conditions)     <- c("subjectID","1","2")
+nomatches                <- which( is.na(match( conditions$subjectID, subj_list))) # Remove rows with NA or data from excluded subjects
+conditions               <- conditions[-nomatches, 1:3] 
+conditionslong           <- reshape2::melt(conditions, id="subjectID")
+colnames(conditionslong) <- c("subjectID", "session", "condition")
+conditionslong$session   <- as.numeric(conditionslong$session)
+datlong                  <- merge(datlong, conditionslong, by=c("subjectID","session"))
 
 
 # ------ Add block and epoch info ------
-datlong$block  <- rep(1:20, times=1,  each=length(subj_list)*2*29)  # repeat same single number for all subjects, 2 sessions, and 29 trials
-datlong$epoch  <- rep(1:29, times=20, each=length(subj_list)*2)     # repeat same single number for all subjects and 2 sessions. Then repeat for each block (20x)
-
-# reduce data dimensions for statistical model
-datlong$blockphase <- rep( 1:5,                           times=1,  each=length(subj_list)*2*29*4) # repeat same single number for all subjects, 2 sessions, 29 trials and 4 "phases" per block
-datlong$epochphase <- rep( c(rep(1:4,times=1,each=7), 4), times=20, each=length(subj_list)*2)      # create number series of 4 "phases" in the 29 epochs. Then repeat same number series for all subjects and 2 sessions. Then repeat for each block (20x)
-datlong_rso$blockphase[datlong_rso$time==0] <- 0
-datlong_rso$blockphase[datlong_rso$time==2] <- 6
-datlong_rso$epochphase <- 0
-
-
-# ------ Add tACS real/sham condition info ------
-# In this file conditions mean: 0=sham tACS / 1=real 5Hz tACS
-conditions <- read.table(paste(path2file,'Random_allocation_log_PITA_deblinded_matlab.csv',sep=""), header=FALSE, sep=",")
-
-# Remove rows with NA or data from excluded subjects
-nomatches  <- which( is.na(match( conditions[ ,1], subj_list)))
-conditions <- conditions[-nomatches, ] 
-
-# Add condition information to dataframe
-datlong$condition <- NA
-datlong_rso$condition <- NA
-for( subji in 1:length(subj_list)){
-  idx.s1 <- which(datlong$subject == conditions[subji,1] & datlong$session == 1)
-  idx.s2 <- which(datlong$subject == conditions[subji,1] & datlong$session == 2)
-  datlong$condition[idx.s1] <- conditions[subji,2]
-  datlong$condition[idx.s2] <- conditions[subji,3]
-  
-  idx.s1_rso <- which(datlong_rso$subject == conditions[subji,1] & datlong_rso$session == 1)
-  idx.s2_rso <- which(datlong_rso$subject == conditions[subji,1] & datlong_rso$session == 2)
-  datlong_rso$condition[idx.s1_rso] <- conditions[subji,2]
-  datlong_rso$condition[idx.s2_rso] <- conditions[subji,3]
+datlong$block  <- NA;  datlong$blockphase  <- NA
+datlong$epoch  <- NA;  datlong$epochphase  <- NA
+for( iblock in 1:20){
+  datlong$block[datlong$trial > (iblock-1)*29 & datlong$trial <= iblock*29 ] <- iblock
+}
+for( iblockphase in 1:5){
+  datlong$blockphase[datlong$block > (iblockphase-1)*4 & datlong$block <= iblockphase*4 ] <- iblockphase
+}
+datlong$epoch      <- datlong$trial - ( (datlong$block-1) * 29 )
+for( iepochphase in 1:5){
+  datlong$epochphase[datlong$epoch > (iepochphase-1)*6 & datlong$epoch <= iepochphase*6 ] <- iepochphase
 }
 
-
-# ------- Add resting-state to tACS-EEG data -----
-datlong.old1 <- datlong
-datlong      <- rbind(datlong,datlong_rso)
-
-baseline    <- ddply(datlong_rso[datlong_rso$time==0,], c("subject","session"),summarise, basepow=mean(power,na.rm=TRUE))
-datlong.old <- merge(datlong.old1, baseline, c("subject","session"))
-
-
+# add Order factor
+datlong$order <- NA
+datlong$order[datlong$session==1&datlong$condition==0] <- "shamfirst"
+datlong$order[datlong$session==2&datlong$condition==1] <- "shamfirst"
+datlong$order[datlong$session==1&datlong$condition==1] <- "realfirst"
+datlong$order[datlong$session==2&datlong$condition==0] <- "realfirst"
 
 # ------ Remove outliers and missings ------
 # Calculate within-subjects mean and SD of power per session
 M.SD     <- ddply(datlong, c("subject","session","blockphase"),summarise, 
-                M=mean(power,na.rm=TRUE), SD=sd(power,na.rm=TRUE) )
+                M=mean(power,na.rm=TRUE), SD=sd(power,na.rm=TRUE),
+                M.ratio=mean(ratio,na.rm=TRUE), SD.ratio=sd(ratio,na.rm=TRUE))
 datlong  <- merge(datlong, M.SD, c("subject","session","blockphase"))
-# datlong  <- merge(datlong, datlong_iaf, c("subject","session"))
-
 
 # Compute upper and lower outlier limits (per subject and session)
-datlong$min <- (datlong$M - 3*(datlong$SD))
-datlong$max <- (datlong$M + 3*(datlong$SD))
+datlong$min <- quantile(datlong$power, 0.05, na.rm=TRUE) #(datlong$M - 2.5*(datlong$SD))
+datlong$max <- quantile(datlong$power, 0.95, na.rm=TRUE) #(datlong$M + 2.5*(datlong$SD))
+datlong$min.ratio <- quantile(datlong$ratio, 0.05, na.rm=TRUE) #(datlong$M.ratio - 2.5*(datlong$SD.ratio))
+datlong$max.ratio <- quantile(datlong$ratio, 0.95, na.rm=TRUE) #(datlong$M.ratio + 2.5*(datlong$SD.ratio))
 
 # Mark outliers
 datlong$outlier <- 0
 datlong$outlier[(datlong$power < datlong$min)] <- 1
 datlong$outlier[(datlong$power > datlong$max)] <- 1
-
+datlong$outlier[(datlong$ratio < datlong$min.ratio)] <- 1
+datlong$outlier[(datlong$ratio > datlong$max.ratio)] <- 1
 table(datlong$outlier)
 
 # Change outliers to NA
-datlong$power.old = datlong$power
+datlong$power.old <- datlong$power
 datlong$power[datlong$outlier == 1] <- NA
+datlong$ratio[datlong$outlier == 1] <- NA
 
 # Change power to NA in 3rd trial of each block, since the tACS artifact is still present in data
 datlong$power[datlong$epoch==3 & datlong$time==1] <- NA
+datlong$ratio[datlong$epoch==3 & datlong$time==1] <- NA
 
-# Calculate mean power in each block (data reduction)
-# meanpow <- ddply(datlong,c("subject","session","block"),summarise, 
-#                  blockpow = mean(power,na.rm=TRUE) )
-# datlong <- merge(datlong, meanpow, c("subject","session","block"))
-
-# Remove data from subjects with gelbridge in EEG data in one of the sessions: 989 (session 1) and 818 (session 2)
-datlong$power[datlong$subject==989 ] <- NA #& datlong$session==1
-datlong$power[datlong$subject==818 ] <- NA #& datlong$session==2
+# Remove data from subjects with gel bridge in EEG data in one of the sessions: 989 (session 1) and 818 (session 2)
+datlong$power[datlong$subjectID==989 ] <- NA; datlong$ratio[datlong$subjectID==989 ] <- NA #& datlong$session==1
+datlong$power[datlong$subjectID==818 ] <- NA; datlong$ratio[datlong$subjectID==818 ] <- NA #& datlong$session==2
 
 # Remove outliers and other missings (NA cells) from dataframe 
 datlong     <- datlong[!is.na(datlong$power), ]
-datlong.old <- datlong.old[!is.na(datlong$power.old), ]
+datlong     <- datlong[!is.na(datlong$ratio), ]
+
 
 
 # --------- Average dataframe ------
-# Make dataframe with average power per block, including blocks 0 and 21 (pre and post resting-state)
-datavg <- ddply(datlong, c("subject","session","condition","time","block"),summarise, 
-                meanpower=mean(power,na.rm=TRUE), SDpower=sd(power,na.rm=TRUE) )
+# Make dataframe with average power per block
+datavg  <- ddply(datlong, c("subject","order","condition","block"),summarise, 
+                meanpower=mean(power,na.rm=TRUE), SDpower=sd(power,na.rm=TRUE),
+                meanratio=mean(ratio,na.rm=TRUE), SDratio=sd(ratio,na.rm=TRUE))
+
+datavg2 <- ddply(datlong, c("subject","session","condition","block"),summarise, 
+                meanpower=mean(power,na.rm=TRUE), SDpower=sd(power,na.rm=TRUE),
+                meanratio=mean(ratio,na.rm=TRUE), SDratio=sd(ratio,na.rm=TRUE))
 
 
 # ------ Define column variable types -----
-datlong.old$subject    <- as.factor(datlong.old$subject)
-datlong.old$session    <- as.factor(datlong.old$session)
-datlong.old$trial      <- as.numeric(datlong.old$trial)
-datlong.old$power      <- as.numeric(datlong.old$power)  
-datlong.old$condition  <- as.factor(datlong.old$condition)
-datlong.old$block      <- as.numeric(datlong.old$block)
-datlong.old$epoch      <- as.numeric(datlong.old$epoch)
-datlong.old$blockphase <- as.numeric(datlong.old$blockphase)
-datlong.old$epochphase <- as.numeric(datlong.old$epochphase)
-datlong.old$time       <- as.numeric(datlong.old$time)
-
 datlong$subject    <- as.factor(datlong$subject)
+datlong$subjectID  <- as.factor(datlong$subjectID)
 datlong$session    <- as.factor(datlong$session)
+datlong$order      <- as.factor(datlong$order)
 datlong$trial      <- as.numeric(datlong$trial)
 datlong$power      <- as.numeric(datlong$power)  
 datlong$condition  <- as.factor(datlong$condition)
@@ -201,20 +159,36 @@ datlong$block      <- as.numeric(datlong$block)
 datlong$epoch      <- as.numeric(datlong$epoch)
 datlong$blockphase <- as.numeric(datlong$blockphase)
 datlong$epochphase <- as.numeric(datlong$epochphase)
-datlong$time       <- as.numeric(datlong$time)
+datlong$ratio      <- as.numeric(datlong$ratio)  
 
 datavg$subject    <- as.factor(datavg$subject)
-datavg$session    <- as.factor(datavg$session)
+datavg$order      <- as.factor(datavg$order)
 datavg$meanpower  <- as.numeric(datavg$meanpower)  
 datavg$SDpower    <- as.numeric(datavg$SDpower)  
 datavg$condition  <- as.factor(datavg$condition)
 datavg$block      <- as.numeric(datavg$block)
-datavg$time       <- as.numeric(datavg$time)
+datavg$meanratio  <- as.numeric(datavg$meanratio)  
+datavg$SDratio    <- as.numeric(datavg$SDratio) 
+
+datavg2$subject    <- as.factor(datavg2$subject)
+datavg2$session    <- as.factor(datavg2$session)
+datavg2$meanpower  <- as.numeric(datavg2$meanpower)  
+datavg2$SDpower    <- as.numeric(datavg2$SDpower)  
+datavg2$condition  <- as.factor(datavg2$condition)
+datavg2$block      <- as.numeric(datavg2$block)
+datavg2$meanratio  <- as.numeric(datavg2$meanratio)  
+datavg2$SDratio    <- as.numeric(datavg2$SDratio) 
+
 
 
 # ------ Find the right distribution ------
 ggqqplot(datlong$power)
-hist(datlong$power,100)
+hist(datlong$power,10000)
+hist(datlong$ratio,10000)
+hist(datavg$meanpower,10000)
+hist(datavg$SDpower,10000)
+hist(datavg$meanratio,10000)
+hist(datavg$SDratio,10000)
 
 set.seed(2021)
 fit.normal <- fitdist( datlong$power, distr = "norm", method = "mle")
@@ -230,55 +204,90 @@ plot(fit.gamma)
 
 # ------ tACS-EEG - Run the LMM ------
 
-# tACS-EEG full dataset, all vars
-lmm1 <- lmer( power ~ condition * session * block * epoch  + (1|subject/session), data = datlong.old, control = lmerControl(optimizer="bobyqa"))
-tab_model(lmm1) #, p.adjust = "fdr") 
-plot_model(lmm1, type="pred", title="tACS-EEG model - 5Hz power", terms=c("condition","block")) + ylab("power") + theme_bw() 
-plot_model(lmm1, type="pred", title="tACS-EEG model - 5Hz power", terms=c("epoch","condition","block")) + ylab("power") + theme_bw() 
+# # All basic factors ('trial'), random intercept for subject
+# lmm00 <- lmer( power ~ condition * order * trial  + (1|subject), data = datlong)
+# tab_model(lmm00) 
+# tab_model(lmm00, p.adjust = "fdr") 
+# plot_model(lmm00, type="pred", title="tACS-EEG model - 5Hz power", terms=c("trial","condition","order")) + ylab("power") + theme_bw() 
 
-# tACS-EEG full dataset, all vars, with baseline 5Hz power as predictor too
-lmm <- lmer( power ~ basepow * condition * session * block * epoch + (1|subject/session), data = datlong.old, control = lmerControl(optimizer="bobyqa"))
-tab_model(lmm) #, p.adjust = "fdr") 
-plot_model(lmm, type="pred", title="tACS-EEG model - 5Hz power", terms=c("epoch","condition","block")) + ylab("power") + theme_bw() 
+# All factors complex ('block'x'epoch'), random intercept for subject
+lmm0 <- lmer( power ~ condition * order * block * epoch  + (1|subject), data = datlong)
+tab_model(lmm0) 
+tab_model(lmm0, p.adjust = "fdr") 
+plot_model(lmm0, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","condition","epoch")) + ylab("power") + theme_bw() 
+plot_model(lmm0, type="pred", title="tACS-EEG model - 5Hz power", terms=c("epoch","condition","block")) + ylab("power") + theme_bw() 
+plot_model(lmm0, type="pred", title="tACS-EEG model - 5Hz power", terms=c("epoch","condition","block","order")) + ylab("power") + theme_bw() 
 
+# Follow-up model per order
+lmm0.1 <- lmer( power ~ condition * block * epoch  + (1|subject), data = datlong[datlong$order=="shamfirst",])
+tab_model(lmm0.1) 
+tab_model(lmm0.1, p.adjust = "fdr") 
+plot_model(lmm0.1, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","condition","epoch")) + ylab("power") + theme_bw() 
+plot_model(lmm0.1, type="pred", title="tACS-EEG model - 5Hz power", terms="condition") + ylab("power") + theme_bw() 
 
-# tACS-EEG full dataset, no epoch
-lmm2 <- lmer( power ~ condition * session * block + (1|subject/session), data = datlong.old, control = lmerControl(optimizer="bobyqa"))
-tab_model(lmm2) #, p.adjust = "fdr") 
-plot_model(lmm2, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","condition","session")) + ylab("power") + theme_bw() 
-
-lmm0 <- lmer( power ~ basepow * condition * session * block  + (1|subject/session), data = datlong.old, control = lmerControl(optimizer="bobyqa"))
-tab_model(lmm0) #, p.adjust = "fdr") 
-plot_model(lmm0, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","condition","session")) + ylab("power") + theme_bw() 
-
-
-
-# with avg dataset SDpower
-lmm5 <- lmer( SDpower ~ condition * session * block * time + (1|subject/session), data = datavg)
-tab_model(lmm5) #, p.adjust = "fdr") 
-plot_model(lmm5, type="pred", title="SD rest+tACS-EEG model - 5Hz power", terms=c("time","condition","session")) + ylab("SD power") + theme_bw() 
-
+lmm0.2 <- lmer( power ~ condition * block * epoch  + (1|subject), data = datlong[datlong$order=="realfirst",])
+tab_model(lmm0.2) 
+tab_model(lmm0.2, p.adjust = "fdr") 
+plot_model(lmm0.2, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","condition","epoch")) + ylab("power") + theme_bw() 
+plot_model(lmm0.2, type="pred", title="tACS-EEG model - 5Hz power", terms=c("epoch","condition","block")) + ylab("power") + theme_bw() 
 
 
-# ------ resting-state EEG - Run the LMM ------
 
-lmm_rso <- lmer( power ~ condition * session * time + (1|subject/session), data = datlong_rso)
-tab_model(lmm_rso) #, p.adjust = "fdr") 
-summary(lmm_rso) 
 
-# Plot predicted values
-plot_model(lmm_rso, type="pred", title="5Hz power", terms=c("time","condition","session")) + ylab("mean 5Hz power") + theme_bw() 
+# Simplifying the model: use avg dataset SDpower
+lmm11 <- lmer( meanpower ~ condition * order * block  + (1|subject), data = datavg)
+tab_model(lmm11) 
+tab_model(lmm11, p.adjust = "fdr") 
+plot_model(lmm11, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","condition","order")) + ylab("mean power") + theme_bw() 
+plot_model(lmm11, type="pred", title="tACS-EEG model - 5Hz power", terms=c("order","condition")) + ylab("mean power") + theme_bw() 
+plot_model(lmm11, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","condition")) + ylab("mean power") + theme_bw() 
 
-#Plot predicted mean values
-plot_model(lmm_rso, type="pred", title="5Hz power", terms=c("time","condition")) + ylab("mean 5Hz power") + theme_bw()   # + scale_colour_manual(values=c("#e77e3a","#0F3EAA")) 
+# Follow-up model per order
+lmm11.1 <- lmer( meanpower ~ condition * block  + (1|subject), data = datavg[datavg$order=="shamfirst",])
+tab_model(lmm11.1) 
+tab_model(lmm11.1, p.adjust = "fdr") 
+plot_model(lmm11.1, type="pred", title="tACS-EEG model - 5Hz power - Sham first", terms=c("block")) + ylab("power") + theme_bw() 
+plot_model(lmm11.1, type="pred", title="tACS-EEG model - 5Hz power - Sham first", terms=c("condition")) + ylab("power") + theme_bw() 
+plot_model(lmm11.1, type="pred", title="tACS-EEG model - 5Hz power - Sham first", terms=c("block","condition")) + ylab("power") + theme_bw() 
 
+lmm11.2 <- lmer( meanpower ~ condition * block + (1|subject), data = datavg[datavg$order=="realfirst",])
+tab_model(lmm11.2) 
+tab_model(lmm11.2, p.adjust = "fdr") 
+plot_model(lmm11.2, type="pred", title="tACS-EEG model - 5Hz power - Real first", terms=c("block","condition")) + ylab("power") + theme_bw() 
+
+# Follow-up per condition
+lmm11.3 <- lmer( meanpower ~ order * block  + (1|subject), data = datavg[datavg$condition==1,])
+tab_model(lmm11.3) 
+tab_model(lmm11.3, p.adjust = "fdr") 
+plot_model(lmm11.3, type="pred", title="tACS-EEG model - 5Hz power - Real tACS", terms=c("block")) + ylab("power") + theme_bw() 
+plot_model(lmm11.3, type="pred", title="tACS-EEG model - 5Hz power - Sham tACS", terms=c("block","order")) + ylab("power") + theme_bw() 
+
+lmm11.4 <- lmer( meanpower ~ order * block + (1|subject), data = datavg[datavg$condition==0,])
+tab_model(lmm11.4) 
+tab_model(lmm11.4, p.adjust = "fdr") 
+plot_model(lmm11.4, type="pred", title="tACS-EEG model - 5Hz power - Sham tACS", terms=c("block")) + ylab("power") + theme_bw() 
+plot_model(lmm11.4, type="pred", title="tACS-EEG model - 5Hz power - Sham tACS", terms=c("block","order")) + ylab("power") + theme_bw() 
+
+# Follow-up as between-subjects only session 1:
+lmm22 <- lmer( meanpower ~ condition * block  + (1|subject), data = datavg2[datavg2$session==1,])
+tab_model(lmm22) 
+tab_model(lmm22, p.adjust = "fdr") 
+plot_model(lmm22, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","condition")) + ylab("mean power") + theme_bw() 
+
+
+# ---- Analyze theta/beta ratio -----
+# Simplifying the model: use avg dataset SDpower
+lmm11.ratio <- lmer( meanratio ~ condition * order * block  + (1|subject), data = datavg)
+tab_model(lmm11.ratio) 
+tab_model(lmm11.ratio, p.adjust = "fdr") 
+plot_model(lmm11.ratio, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","condition","order")) + ylab("mean ratio 5Hz / beta power") + theme_bw() 
 
 
 # -------- further tACS-EEG analysis things -------
 
 # Compute confidence intervals via parametric bootstrapping
 set.seed(2023)
-confint(lmm, method="boot")
+confint(lmm0, method="boot")
 #                                         2.5 %        97.5 %
 # .sig01                           7.311188e-02  1.262995e-01
 # .sig02                           5.221630e-02  1.271914e-01
@@ -305,7 +314,7 @@ confint(lmm, method="boot")
 
 # --------- Plot --------
 plotdata <- ddply(datlong, 
-                  c("condition","blockphase","session"), 
+                  c("condition","blockphase","order"), 
                   summarise,
                   N    = sum(!is.na(power)),
                   mean = mean(power, na.rm=TRUE),
@@ -313,20 +322,40 @@ plotdata <- ddply(datlong,
                   sd   = sd(power, na.rm=TRUE),
                   se   = sd / sqrt(N) )
 
-all <- ggplot(plotdata, aes(x=blockphase, y=mean, group=condition, fill=condition)) +
+ggplot(plotdata, aes(x=blockphase, y=mean, group=condition, fill=condition)) +
   # geom_ribbon(aes(  ymin=mean-sd, ymax=mean+sd, fill=condition), alpha = .175) +
   # geom_line(size = 0.5, color = "black", aes(x=blockphase, y=meanpred, group=condition, linetype=condition)) +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.2, size = 0.3, position=position_dodge(0.01)) +
   geom_line(size=0.7, aes(color=condition)) + 
   ylim(c(0.3,0.65)) +
   geom_point(size = 3, stroke = 1, aes(colour=condition, shape=condition)) +
-  ylab("Spectral power") + xlab("Phase") + ggtitle("All ppn") +
+  ylab("Spectral power") + xlab("Blockphase") + ggtitle("All ppn") +
   scale_colour_manual(values=c("#999999","#28558f")) + scale_fill_manual(values=c("#999999","#28558f")) +
-  facet_wrap( . ~ session)
+  facet_wrap( . ~ order)
 
 
-plotdata2 <- ddply(datlong, 
-                  c("condition","block","session","epoch"), 
+plotdataall <- ddply(datlong, 
+                      c("condition","blockphase","epochphase"), 
+                      summarise,
+                      N    = sum(!is.na(power)),
+                      mean = mean(power, na.rm=TRUE),
+                      #  meanpred = mean(predvals, na.rm=TRUE),
+                      sd   = sd(power, na.rm=TRUE),
+                      se   = sd / sqrt(N) )
+
+all <- ggplot(plotdataall, aes(x=epochphase, y=mean, group=condition, fill=condition)) +
+  # geom_ribbon(aes(  ymin=mean-sd, ymax=mean+sd, fill=condition), alpha = .175) +
+  # geom_line(size = 0.5, color = "black", aes(x=blockphase, y=meanpred, group=condition, linetype=condition)) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.2, size = 0.3, position=position_dodge(0.01)) +
+  geom_line(size=0.7, aes(color=condition)) + 
+  ylim(c(0.35,0.55)) +
+  geom_point(size = 3, stroke = 1, aes(colour=condition, shape=condition)) +
+  ylab("Spectral power") + xlab("Epochphase") + ggtitle("All ppn") +
+  scale_colour_manual(values=c("#999999","#28558f")) + scale_fill_manual(values=c("#999999","#28558f")) +
+  facet_wrap( . ~ blockphase)
+
+plotdatareal <- ddply(datlong[datlong$order=="realfirst",], 
+                  c("condition","blockphase","epochphase"), 
                   summarise,
                   N    = sum(!is.na(power)),
                   mean = mean(power, na.rm=TRUE),
@@ -334,16 +363,59 @@ plotdata2 <- ddply(datlong,
                   sd   = sd(power, na.rm=TRUE),
                   se   = sd / sqrt(N) )
 
-ggplot(plotdata2, aes(x=epoch, y=mean, group=condition, fill=condition)) +
+real <- ggplot(plotdatareal, aes(x=epochphase, y=mean, group=condition, fill=condition)) +
   # geom_ribbon(aes(  ymin=mean-sd, ymax=mean+sd, fill=condition), alpha = .175) +
   # geom_line(size = 0.5, color = "black", aes(x=blockphase, y=meanpred, group=condition, linetype=condition)) +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.2, size = 0.3, position=position_dodge(0.01)) +
   geom_line(size=0.7, aes(color=condition)) + 
-  ylim(c(0.3,0.65)) +
+  ylim(c(0.35,0.55)) +
   geom_point(size = 3, stroke = 1, aes(colour=condition, shape=condition)) +
+  ylab("Spectral power") + xlab("Epochphase") + ggtitle("Real first") +
+  scale_colour_manual(values=c("#999999","#28558f")) + scale_fill_manual(values=c("#999999","#28558f")) +
+  facet_wrap( . ~ blockphase)
+
+plotdatasham <- ddply(datlong[datlong$order=="shamfirst",],  
+                   c("condition","blockphase","epochphase"), 
+                   summarise,
+                   N    = sum(!is.na(power)),
+                   mean = mean(power, na.rm=TRUE),
+                   #  meanpred = mean(predvals, na.rm=TRUE),
+                   sd   = sd(power, na.rm=TRUE),
+                   se   = sd / sqrt(N) )
+
+sham <- ggplot(plotdatasham, aes(x=epochphase, y=mean, group=condition, fill=condition)) +
+  # geom_ribbon(aes(  ymin=mean-sd, ymax=mean+sd, fill=condition), alpha = .175) +
+  # geom_line(size = 0.5, color = "black", aes(x=blockphase, y=meanpred, group=condition, linetype=condition)) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.2, size = 0.3, position=position_dodge(0.01)) +
+  geom_line(size=0.7, aes(color=condition)) + 
+  ylim(c(0.35,0.55)) +
+  geom_point(size = 3, stroke = 1, aes(colour=condition, shape=condition)) +
+  ylab("Spectral power") + xlab("Epochphase") + ggtitle("Sham first") +
+  scale_colour_manual(values=c("#999999","#28558f")) + scale_fill_manual(values=c("#999999","#28558f")) +
+  facet_wrap( . ~ blockphase)
+
+ggarrange(all, real, sham, nrow = 1, ncol = 3)
+
+
+plotdata3 <- ddply(datlong, 
+                   c("condition","trial","session"), 
+                   summarise,
+                   N    = sum(!is.na(power)),
+                   mean = mean(power, na.rm=TRUE),
+                   #  meanpred = mean(predvals, na.rm=TRUE),
+                   sd   = sd(power, na.rm=TRUE),
+                   se   = sd / sqrt(N) )
+
+ggplot(plotdata3, aes(x=trial, y=mean, group=condition, fill=condition)) +
+  geom_ribbon(aes(  ymin=mean-sd, ymax=mean+sd, fill=condition), alpha = .175) +
+  # geom_line(size = 0.5, color = "black", aes(x=blockphase, y=meanpred, group=condition, linetype=condition)) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.2, size = 0.3, position=position_dodge(0.01)) +
+  geom_line(size=2, aes(color=condition)) + 
+   ylim(c(0.35,0.55)) +
+  geom_point(size = .3, stroke = 1, aes(colour=condition, shape=condition)) +
   ylab("Spectral power") + xlab("Phase") + ggtitle("All ppn") +
   scale_colour_manual(values=c("#999999","#28558f")) + scale_fill_manual(values=c("#999999","#28558f")) +
-  facet_wrap( . ~ block)
+  facet_wrap( . ~ session)
 
 
 # --------- Plot with split on baseline 5 hz power --------

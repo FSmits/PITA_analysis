@@ -42,7 +42,7 @@ cd('/Users/fsmits2/Downloads/eeglab2022.1')
 % cd('/Users/fsmits2/Documents/PITA_analysis'); % return to PITA analysis folder
 
 % set paths to data
-Path2EEGsets = '/Users/fsmits2/Downloads/1 EEG data tacs-eeg/post-tacs r-s processed/';
+Path2EEGsets = '/Users/fsmits2/Downloads/1 EEG data tacs-eeg/3 EEG sets processed/';
 
 % enter subject names
 subj_list =[669	557 363	638	989	383	502	733	442	575	710	262 ...
@@ -63,22 +63,22 @@ file_type = {rec1, rec2, rec3, rec4, rec5};
 %% Do the fourier Transform
 
 % Pre-specify a matrix (dataframe) to save outcomes in the size: Subject x session x channels x condition(eyes open vs. closed) x outcome(theta power, beta power, theta/beta ratio, number of 1-sec-epochs)
-% % % datfr       = nan(length(subj_list), length(sessions), 30, 513, 600); %for tACS-EEG data
-% % % datfr_dense = datfr;
-datfr_rso   = nan(length(subj_list), length(sessions), 30, 513, 120); %for resting-state EEG data eyes-open
-datfr_rsc   = nan(length(subj_list), length(sessions), 30, 513, 120); %eyes-closed
+datfr       = nan(length(subj_list), length(sessions), 30, 513, 600); %for tACS-EEG data
+datfr_dense = datfr;
+% % % % datfr_rso   = nan(length(subj_list), length(sessions), 30, 513, 120); %for resting-state EEG data eyes-open
+% % % % datfr_rsc   = nan(length(subj_list), length(sessions), 30, 513, 120); %eyes-closed
 
 % Which task (file type) you want to analyze?
-fileno = 4;
+fileno = 3;
 
 % Loop over subjects and sessions
 for subj_i = 1:length(subj_list)
     for sess_i = 1:length(sessions)
 
-        %%% for post-tACS rest EEG only (subj 989 and 733 have gel bridge data in session 1 - not usable):
-        if (subj_list(subj_i) == 989 && sess_i == 1) || (subj_list(subj_i) == 733 && sess_i == 1)
-            continue
-        end
+% % % %         %%% for post-tACS rest EEG only (subj 989 and 733 have gel bridge data in session 1 - not usable):
+% % % %         if (subj_list(subj_i) == 989 && sess_i == 1) || (subj_list(subj_i) == 733 && sess_i == 1)
+% % % %             continue
+% % % %         end
 
         fprintf('\n*** Load preprocessed data from: subject %i session %i\n', subj_list(subj_i), sessions(sess_i));
         fileName = [file_type{fileno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG.set'];
@@ -86,49 +86,53 @@ for subj_i = 1:length(subj_list)
         % Load EEG set
         EEG      = pop_loadset('filename', fileName, 'filepath', Path2EEGsets);
 
-        % Split dataset into eyes-open and eyes-closed
-        openidx   = find(11 == str2double({EEG.event.type}));
-        closedidx = find(22 == str2double({EEG.event.type}));
-        openeps   = cell2mat({EEG.event(openidx).epoch});
-        closedeps = cell2mat({EEG.event(closedidx).epoch});
         % Put EEG data in double precision for good computation performance
-% % %         EEG.datax = double( EEG.data); 
-        EEG.datax_o = double( EEG.data(:,:,openeps) ); 
-        EEG.datax_c = double( EEG.data(:,:,closedeps) ); 
+        EEG.datax = double( EEG.data);
+% % % %         % Split dataset into eyes-open and eyes-closed
+% % % %         openidx   = find(11 == str2double({EEG.event.type}));
+% % % %         closedidx = find(22 == str2double({EEG.event.type}));
+% % % %         openeps   = cell2mat({EEG.event(openidx).epoch});
+% % % %         closedeps = cell2mat({EEG.event(closedidx).epoch});
+% % % %         EEG.datax_o = double( EEG.data(:,:,openeps) );
+% % % %         EEG.datax_c = double( EEG.data(:,:,closedeps) );
 
         % Prepare Fourier Transform
         nfft      = EEG.srate * 4; % For zero-padding (upsampling) and overlapping in Welch's method
-        nOverlap  = size(EEG.datax_o,2)/2; % For no overlap: 0;  for 50% overlap: size(EEG.datax,2)/2
+        nOverlap  = size(EEG.datax,2)/2; % For no overlap: 0;  for 50% overlap: size(EEG.datax,2)/2
 
         hannw     = hann(EEG.pnts); % Create Hann window to taper the data with.      = .5 * (1 - cos(2*pi*linspace( 0, 1, size(EEG.datax,2) ) ));
 
-        powspec_o   = nan( EEG.nbchan-2, EEG.srate*2+1, size(EEG.datax_o,3) ); % pre-specify power spectrum variable to save FFT results
-        powspec_c   = nan( EEG.nbchan-2, EEG.srate*2+1, size(EEG.datax_c,3) ); % pre-specify power spectrum variable to save FFT results
+        % pre-specify power spectrum variable to save FFT results
+        powspec   = nan( EEG.nbchan-2, EEG.srate*2+1, size(EEG.datax,3) );
+% % % %         powspec_o = nan( EEG.nbchan-2, EEG.srate*2+1, size(EEG.datax_o,3) );
+% % % %         powspec_c = nan( EEG.nbchan-2, EEG.srate*2+1, size(EEG.datax_c,3) ); 
 
         % Do the FFT. Loop over channels
         fprintf('\n*** Compute power spectrum - subject %i session %i\n', subj_list(subj_i), sessions(sess_i));
         for chani = 1:EEG.nbchan-2 % minus the last two channels (EMG): HEOG & VEOG
             % Do the FFT for each frequency and epoch using Welch's method (MATLAB's function pwelch)
-            [powspec_o(chani,:,:), hz] = pwelch( squeeze( EEG.datax_o(chani,:,:) ), hannw, nOverlap, nfft, EEG.srate );
-            [powspec_c(chani,:,:), hz] = pwelch( squeeze( EEG.datax_c(chani,:,:) ), hannw, nOverlap, nfft, EEG.srate );
+            [powspec(chani,:,:), hz] = pwelch( squeeze( EEG.datax(chani,:,:) ), hannw, nOverlap, nfft, EEG.srate );
+% % % %             [powspec_o(chani,:,:), hz] = pwelch( squeeze( EEG.datax_o(chani,:,:) ), hannw, nOverlap, nfft, EEG.srate );
+% % % %             [powspec_c(chani,:,:), hz] = pwelch( squeeze( EEG.datax_c(chani,:,:) ), hannw, nOverlap, nfft, EEG.srate );
         end
 
         % Save powespectra in the dense matrix:
         fprintf('\n*** Save dense power spectrum - subject %i session %i\n', subj_list(subj_i), sessions(sess_i));
-        datfr_rso(subj_i, sess_i, :, : , 1:size(EEG.datax_o,3)) = powspec_o;
-        datfr_rsc(subj_i, sess_i, :, : , 1:size(EEG.datax_c,3)) = powspec_c;
+        datfr_dense(    subj_i, sess_i, :, : , 1:size(EEG.datax,3)) = powspec;
+% % % %         datfr_rso(subj_i, sess_i, :, : , 1:size(EEG.datax_o,3)) = powspec_o;
+% % % %         datfr_rsc(subj_i, sess_i, :, : , 1:size(EEG.datax_c,3)) = powspec_c;
 
-% % %         %%% Only for tACS-EEG
-% % %         % Save powerspectra per epoch in it's original position in the tACS-EEG timing
-% % %         fprintf('\n*** Save power spectrum per epoch in original timing - subject %i session %i\n', subj_list(subj_i), sessions(sess_i));
-% % %         for epoci = 1:EEG.trials      
-% % %             timetrigg = str2double( EEG.event(epoci).type ) ;
-% % %             block     = floor( timetrigg );
-% % %             sec       = round( (timetrigg - block) * 100 );
-% % % 
-% % %             epocpos   = (block-1) * 29 + sec;
-% % %             datfr(subj_i, sess_i, :, : , epocpos) = powspec(:, :, epoci);
-% % %         end
+        %%% Only for tACS-EEG
+        % Save powerspectra per epoch in it's original position in the tACS-EEG timing
+        fprintf('\n*** Save power spectrum per epoch in original timing - subject %i session %i\n', subj_list(subj_i), sessions(sess_i));
+        for epoci = 1:EEG.trials      
+            timetrigg = str2double( EEG.event(epoci).type ) ;
+            block     = floor( timetrigg );
+            sec       = round( (timetrigg - block) * 100 );
+
+            epocpos   = (block-1) * 29 + sec;
+            datfr(subj_i, sess_i, :, : , epocpos) = powspec(:, :, epoci);
+        end
 
         clear EEG
         ALLEEG(1:end) = [];
@@ -155,15 +159,15 @@ save(filename1,'datfr_rsc', '-v7.3');
 %% Look at result | Topoplots for channel selection in spectral power analyses
 
 % Load the table with noisy channels (to be excluded from analysis)
-bdchns = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_07-Jun-2023.txt'] ,'ReadVariableNames', false,'Format','auto') );
+bdchns = table2cell(  readtable( [Path2EEGsets 'Overview_badchannels_def.txt'] ,'ReadVariableNames', false,'Format','auto') );
 
 % pre-specify variable to save clean power outcomes in
-% % % cleandatfr    = nan(length(subj_list), length(sessions), 30, 513, 600); % for tacs-EEG data
-cleandatfr_o    = nan(length(subj_list), length(sessions), 30, 513, 120); %eyes-open
-cleandatfr_c    = nan(length(subj_list), length(sessions), 30, 513, 120); %eyes-closed
+cleandatfr    = nan(length(subj_list), length(sessions), 30, 513, 600); % for tacs-EEG data
+% % % % cleandatfr_o    = nan(length(subj_list), length(sessions), 30, 513, 120); %eyes-open
+% % % % cleandatfr_c    = nan(length(subj_list), length(sessions), 30, 513, 120); %eyes-closed
 
 % Load EEG set
-fileno   = 4;
+fileno   = 3;
 fileName = [file_type{fileno} '642-2_CleanEEG.set'];
 EEG      = pop_loadset('filename', fileName, 'filepath', Path2EEGsets);
 
@@ -288,29 +292,31 @@ title({'4 - 7.5 Hz'});   c = colorbar; c.Label.String = 'Power \muV^2'; set(gca,
 %% Output matrix for stats in R
 
 % LOAD datfr as matrix (not cleandatfr)
+cd('/Users/fsmits2/Documents/PITA_analysis'); % return to PITA analysis folder
 load hz_saved.mat
-% % % datfr = importdata('datfr_saved.mat');
-datfr_rso = importdata('datfr_rso_saved.mat');
-datfr_rsc = importdata('datfr_rsc_saved.mat');
+datfr = importdata('datfr_saved.mat');
+% % % % datfr_rso = importdata('datfr_rso_saved.mat');
+% % % % datfr_rsc = importdata('datfr_rsc_saved.mat');
 
 % Load the table with noisy channels (to be excluded from analysis)
 %%%%%% bdchns = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_14-Feb-2023.txt'] ,'Format','auto') );
-bdchns = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_07-Jun-2023.txt'] ,'ReadVariableNames', false,'Format','auto') );
+bdchns = table2cell(  readtable( [Path2EEGsets '/Overview_badchannels_def.txt'] ,'ReadVariableNames', false,'Format','auto') );
 
 % Load EEG set
-fileName = [file_type{4} '642-2_CleanEEG.set'];
+fileno   = 3;
+fileName = [file_type{fileno} '642-2_CleanEEG.set'];
 EEG      = pop_loadset('filename', fileName, 'filepath', Path2EEGsets);
 
 % Select channels for. For theta activity: overall power is strongest over Fz and surrounding channels
-channames = {'AF3' 'AF4' 'FC1' 'FC2' 'FC5' 'FC6' 'F7' 'F8'};
+channames = {'AF3' 'AF4' 'FC1' 'FC2' 'FC5' 'FC6' 'F7' 'F8' 'Fz'}; % channames = {'AF3' 'AF4' 'FC1' 'FC2' 'FC5' 'FC6' 'F7' 'F8'};
 chans2use = [];
 for chani = 1:length(channames)
     chans2use(chani) = find( strcmpi( channames{chani}, {EEG.chanlocs.labels} ));
 end
 
 % Average over selected channels and frequencies
-% % % powdat = nan(length(subj_list), length(sessions), 600); %for tACS_EEG data
-powdat = nan(length(subj_list), length(sessions), 120); %eyes-open
+powdat = nan(length(subj_list), length(sessions), 600); %for tACS_EEG data
+% % % % powdat = nan(length(subj_list), length(sessions), 120); %eyes-open
 
 % Select frequencies
 frqidx   = dsearchn(hz, [4.75  5.25]');
@@ -332,6 +338,7 @@ for subj_i = 1:length(subj_list)
         
         % Extract from data
         dataextract = [];
+        % % % dataextract = datfr(subj_i,sess_i, chans2use_now, frqidx(1):frqidx(2), :);
         dataextract = datfr_rso(subj_i,sess_i, chans2use_now, frqidx(1):frqidx(2), :);
         % Average over channels and frequencies and log-transform
         powdat(subj_i,sess_i,:) = log10(squeeze( mean( mean(dataextract,4,'omitnan') ,3,'omitnan') ) );
