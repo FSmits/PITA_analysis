@@ -8,7 +8,7 @@ library(reshape2)  # install.packages("reshape2")
 library(plyr)
 library(ggplot2); library("ggpubr")
 library(fitdistrplus); library(emmeans); library("lme4"); library("optimx") 
-library(sjPlot)
+library(sjPlot); library("pbkrtest")
 
 # ------ Clear workspace ------
 rm(list=ls())
@@ -99,9 +99,9 @@ datlong$order[datlong$session==2&datlong$condition==0] <- "realfirst"
 
 # ------ Remove outliers and missings ------
 # Calculate within-subjects mean and SD of power per session
-M.SD     <- ddply(datlong, c("subject","session","blockphase"),summarise, 
-                M=mean(power,na.rm=TRUE), SD=sd(power,na.rm=TRUE) ) #, M.ratio=mean(ratio,na.rm=TRUE), SD.ratio=sd(ratio,na.rm=TRUE))
-datlong  <- merge(datlong, M.SD, c("subject","session","blockphase"))
+# M.SD     <- ddply(datlong, c("subject","session","blockphase"),summarise, 
+#                 M=mean(power,na.rm=TRUE), SD=sd(power,na.rm=TRUE) ) #, M.ratio=mean(ratio,na.rm=TRUE), SD.ratio=sd(ratio,na.rm=TRUE))
+# datlong  <- merge(datlong, M.SD, c("subject","session","blockphase"))
 
 # Compute upper and lower outlier limits (per subject and session)
 datlong$min <- quantile(datlong$power, 0.05, na.rm=TRUE) #(datlong$M - 2.5*(datlong$SD))
@@ -109,18 +109,18 @@ datlong$max <- quantile(datlong$power, 0.95, na.rm=TRUE) #(datlong$M + 2.5*(datl
 #datlong$min.ratio <- quantile(datlong$ratio, 0.05, na.rm=TRUE) #(datlong$M.ratio - 2.5*(datlong$SD.ratio))
 #datlong$max.ratio <- quantile(datlong$ratio, 0.95, na.rm=TRUE) #(datlong$M.ratio + 2.5*(datlong$SD.ratio))
 
-# Mark outliers
-datlong$outlier <- 0
-datlong$outlier[(datlong$power < datlong$min)] <- 1
-datlong$outlier[(datlong$power > datlong$max)] <- 1
-#datlong$outlier[(datlong$ratio < datlong$min.ratio)] <- 1
-#datlong$outlier[(datlong$ratio > datlong$max.ratio)] <- 1
-table(datlong$outlier)
-
-# Change outliers to NA
-datlong$power.old <- datlong$power
-datlong$power[datlong$outlier == 1] <- NA
-#datlong$ratio[datlong$outlier == 1] <- NA
+# # Mark outliers
+# datlong$outlier <- 0
+# datlong$outlier[(datlong$power < datlong$min)] <- 1
+# datlong$outlier[(datlong$power > datlong$max)] <- 1
+# #datlong$outlier[(datlong$ratio < datlong$min.ratio)] <- 1
+# #datlong$outlier[(datlong$ratio > datlong$max.ratio)] <- 1
+# table(datlong$outlier)
+# 
+# # Change outliers to NA
+# datlong$power.old <- datlong$power
+# datlong$power[datlong$outlier == 1] <- NA
+# #datlong$ratio[datlong$outlier == 1] <- NA
 
 # Change power to NA in 3rd trial of each block, since the tACS artifact is still present in data
 datlong$power[datlong$epoch==3 & datlong$time==1] <- NA
@@ -138,7 +138,7 @@ head(datlong,3)
 
 # --------- Average dataframe ------
 # Make dataframe with average power per block
-datavg  <- ddply(datlong, c("subject","session","order","condition","block"),summarise, 
+datavg  <- ddply(datlong, c("subjectID","session","order","condition","block"),summarise, 
                 meanpower=mean(power,na.rm=TRUE), SDpower=sd(power,na.rm=TRUE) ) #, meanratio=mean(ratio,na.rm=TRUE), SDratio=sd(ratio,na.rm=TRUE))
 head(datavg,3)
 
@@ -157,7 +157,7 @@ datlong$blockphase <- as.numeric(datlong$blockphase)
 datlong$epochphase <- as.numeric(datlong$epochphase)
 #datlong$ratio      <- as.numeric(datlong$ratio)  
 
-datavg$subject    <- as.factor(datavg$subject)
+datavg$subjectID  <- as.factor(datavg$subject)
 datavg$order      <- as.factor(datavg$order)
 datavg$meanpower  <- as.numeric(datavg$meanpower)  
 datavg$SDpower    <- as.numeric(datavg$SDpower)  
@@ -191,23 +191,29 @@ plot(fit.gamma)
 # ------ tACS-EEG - Run the LMM ------
 
 # Simple interaction model (no order); all factors ('block'x'epoch'), random intercept for subject and session
-lmm0 <- lmer( power ~ condition * block   + (1|subject/session), data = datlong)
-tab_model(lmm0) 
+lmm0 <- lmer( power ~ condition * block * epoch  + (1|subject/session) , data = datlong)
+tab_model(lmm0) ; summary(lmm0)
 plot_model(lmm0, type="pred", title="tACS-EEG model - 5Hz power", terms=c("epoch","condition","block")) + ylab("power") + theme_bw() 
 plot_model(lmm0, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","condition","epoch")) + ylab("power") + theme_bw() 
 plot_model(lmm0, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","condition")) + ylab("power") + theme_bw() 
+plot_model(lmm0, type="pred", title="tACS-EEG model - 5Hz power", terms=c("condition")) + ylab("power") + theme_bw() 
 
-# All factors complex ('block'x'epoch'), random intercept for subject
-lmm01 <- lmer( power ~ condition * order * block   + (1|subject/session), data = datlong)
+# With order in the model
+lmm00 <- lmer( power ~ order * condition * block * epoch  + (1|subject/session) , data = datlong)
+tab_model(lmm00) ; summary(lmm1)
+plot_model(lmm00, type="pred", title="tACS-EEG model - 5Hz power", terms=c("epoch","condition")) + ylab("power") + theme_bw() 
+plot_model(lmm00, type="pred", title="tACS-EEG model - 5Hz power", terms=c("epoch","condition","block")) + ylab("power") + theme_bw() 
+
+# No 'epoch', random intercept for subject
+lmm01 <- lmer( power ~ condition * block * order + (1|subject/session), data = datlong)
 tab_model(lmm01) 
-plot_model(lmm01, type="pred", title="tACS-EEG model - 5Hz power", terms=c("epoch","condition","block")) + ylab("power") + theme_bw() 
 plot_model(lmm01, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","condition","order")) + ylab("power") + theme_bw() 
 
 # Because of order effects: run the model as between-subject for session-1 only ("naive" subjects)
-lmm00 <- lmer( power ~ condition * block   + (1|subject), data = datlong[datlong$session==1,])
-tab_model(lmm00) 
-plot_model(lmm00, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","condition")) + ylab("power") + theme_bw() 
-plot_model(lmm00, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","condition","epoch")) + ylab("power") + theme_bw() 
+lmm02 <- lmer( power ~ condition * block   + (1|subject), data = datlong[datlong$session==1,])
+tab_model(lmm02) 
+plot_model(lmm02, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","condition")) + ylab("power") + theme_bw() 
+plot_model(lmm02, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","condition","epoch")) + ylab("power") + theme_bw() 
 
 # Follow-up on the 3-way condition x block x epoch
 lmm001 <- lmer( power ~ condition * block  + (1|subject), data = datlong[datlong$session==1 & datlong$epochphase==1,])
@@ -254,28 +260,30 @@ plot_model(lmm000, type="pred", title="tACS-EEG model - 5Hz power", terms=c("blo
 
 # Simplifying the model: use avg dataset SDpower
 # 1 Simple interaction, no order effect
-lmm1 <- lmer( meanpower ~ condition * block  + (1|subject/session), data = datavg)
+lmm1 <- lmer( meanpower ~ condition * block  + (1|subjectID/session), data = datavg)
 tab_model(lmm1) 
 plot_model(lmm1, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","condition")) + ylab("mean power") + theme_bw() 
 
 # 11 More complex interaction, including order effect
-lmm11 <- lmer( meanpower ~ condition * order * block  + (1|subject/session), data = datavg)
+lmm11 <- lmer( meanpower ~ condition * order * block  + (1|subjectID/session), data = datavg)
 tab_model(lmm11) 
 plot_model(lmm11, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","condition","order")) + ylab("mean power") + theme_bw() 
+plot_model(lmm11, type="pred", title="tACS-EEG model - 5Hz power", terms=c("order","condition")) + ylab("mean power") + theme_bw() 
+
 
 # Follow-up model per order
-lmm11.1 <- lmer( meanpower ~ condition * block  + (1|subject/session), data = datavg[datavg$order=="shamfirst",])
+lmm11.1 <- lmer( meanpower ~ condition * block  + (1|subjectID/session), data = datavg[datavg$order=="shamfirst",])
 tab_model(lmm11.1) 
 plot_model(lmm11.1, type="pred", title="tACS-EEG model - 5Hz power - Sham first", terms=c("block")) + ylab("power") + theme_bw() 
 plot_model(lmm11.1, type="pred", title="tACS-EEG model - 5Hz power - Sham first", terms=c("condition")) + ylab("power") + theme_bw() 
 plot_model(lmm11.1, type="pred", title="tACS-EEG model - 5Hz power - Sham first", terms=c("block","condition")) + ylab("power") + theme_bw() 
 
-lmm11.2 <- lmer( meanpower ~ condition * block + (1|subject/session), data = datavg[datavg$order=="realfirst",])
+lmm11.2 <- lmer( meanpower ~ condition * block + (1|subjectID/session), data = datavg[datavg$order=="realfirst",])
 tab_model(lmm11.2) 
 plot_model(lmm11.2, type="pred", title="tACS-EEG model - 5Hz power - Real first", terms=c("block","condition")) + ylab("power") + theme_bw() 
 
 # Because of order effects: run the model as between-subject for session-1 only ("naive" subjects)
-lmm2 <- lmer( meanpower ~ condition * block  + (1|subject), data = datavg[datavg$session==1,])
+lmm2 <- lmer( meanpower ~ condition * block  + (1|subjectID), data = datavg[datavg$session==1,])
 tab_model(lmm2) 
 plot_model(lmm2, type="pred", title="tACS-EEG model - 5Hz power", terms=c("block","condition")) + ylab("mean power") + theme_bw() 
 
@@ -348,13 +356,13 @@ plotdata <- ddply(datlong,
                   se   = sd / sqrt(N) )
 
 ggplot(plotdata, aes(x=blockphase, y=mean, group=condition, fill=condition)) +
-  # geom_ribbon(aes(  ymin=mean-sd, ymax=mean+sd, fill=condition), alpha = .175) +
+   geom_ribbon(aes(  ymin=mean-sd, ymax=mean+sd, fill=condition), alpha = .175) +
   # geom_line(size = 0.5, color = "black", aes(x=blockphase, y=meanpred, group=condition, linetype=condition)) +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.2, size = 0.3, position=position_dodge(0.01)) +
   geom_line(linewidth=0.7, aes(color=condition)) + 
-  ylim(c(0.3,0.65)) +
+ # ylim(c(0.3,0.65)) +
   geom_point(size = 3, stroke = 1, aes(colour=condition, shape=condition)) +
-  ylab("Spectral power") + xlab("Blockphase") + ggtitle("All ppn") +
+  ylab("Spectral power [5Hz]") + xlab("Blockphase") + ggtitle("All ppn") +
   scale_colour_manual(values=c("#999999","#28558f")) + scale_fill_manual(values=c("#999999","#28558f")) +
   facet_wrap( . ~ order)
 
@@ -365,6 +373,46 @@ ggplot(plotdata, aes(x=blockphase, y=mean, group=condition, fill=condition)) +
 
 
 # ----------- Other plots raw data --------------
+plotdata <- ddply(datavg, 
+                  c("condition","block","order"), 
+                  summarise,
+                  N    = sum(!is.na(meanpower)),
+                  mean = mean(meanpower, na.rm=TRUE),
+                  #  meanpred = mean(predvals, na.rm=TRUE),
+                  sd   = sd(meanpower, na.rm=TRUE),
+                  se   = sd / sqrt(N) )
+
+ggplot(plotdata, aes(x=block, y=mean, group=condition, fill=condition)) +
+  geom_ribbon(aes(  ymin=mean-sd, ymax=mean+sd, fill=condition), alpha = .175) +
+  # geom_line(size = 0.5, color = "black", aes(x=blockphase, y=meanpred, group=condition, linetype=condition)) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.2, size = 0.3, position=position_dodge(0.01)) +
+  geom_line(linewidth=0.7, aes(color=condition)) + 
+  # ylim(c(0.3,0.65)) +
+  geom_point(size = 3, stroke = 1, aes(colour=condition, shape=condition)) +
+  ylab("Spectral power [5Hz]") + xlab("Block") + 
+  scale_colour_manual(values=c("#999999","#28558f")) + scale_fill_manual(values=c("#999999","#28558f")) +
+  facet_wrap( . ~ order)
+
+plotdata2 <- ddply(datavg, 
+                  c("condition","session"), 
+                  summarise,
+                  N    = sum(!is.na(meanpower)),
+                  mean = mean(meanpower, na.rm=TRUE),
+                  #  meanpred = mean(predvals, na.rm=TRUE),
+                  sd   = sd(meanpower, na.rm=TRUE),
+                  se   = sd / sqrt(N) )
+
+ggplot(plotdata2, aes(x=session, y=mean, group=condition, fill=condition)) +
+  geom_ribbon(aes(  ymin=mean-se, ymax=mean+se, fill=condition), alpha = .175) +
+  # geom_line(size = 0.5, color = "black", aes(x=blockphase, y=meanpred, group=condition, linetype=condition)) +
+  geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=.2, size = 0.3, position=position_dodge(0.01)) +
+  geom_line(linewidth=0.7, aes(color=condition)) + 
+  # ylim(c(0.3,0.65)) +
+  geom_point(size = 3, stroke = 1, aes(colour=condition, shape=condition)) +
+  ylab("Spectral power [5Hz]") + xlab("Session") + 
+  scale_colour_manual(values=c("#999999","#28558f")) + scale_fill_manual(values=c("#999999","#28558f"))
+
+
 plotdataall <- ddply(datlong, 
                       c("condition","blockphase","epochphase"), 
                       summarise,
