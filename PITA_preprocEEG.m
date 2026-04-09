@@ -71,7 +71,7 @@ close all
 %% Initialize
 
 % open EEGlab
-cd('/Users/fsmits2/Downloads/eeglab2022.1')
+cd('/Users/fsmits2/Downloads/eeglab2024.2')
 [ALLEEG, EEG, CURRENTSET, ALLCOM] = eeglab;
 
 % set paths to data

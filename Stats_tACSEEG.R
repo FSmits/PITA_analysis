@@ -8,7 +8,7 @@ library(reshape2)  # install.packages("reshape2")
 library(plyr)
 library(ggplot2); library("ggpubr")
 library(fitdistrplus); library(emmeans); library("lme4"); library("optimx") 
-library(sjPlot); library("pbkrtest")
+library("sjPlot"); library("pbkrtest")
 
 # ------ Clear workspace ------
 rm(list=ls())
@@ -20,7 +20,7 @@ subj_list <- c(669,	557, 363,	638, 989,	383, 502,	733, 442,	575, 710,	262,
                508, 291,	803,	755, 681,	876, 134,	559, 818,	601, 524,	883, 193, 642) #Copied from Matlab
 
 path2file <- "/Users/fsmits2/Documents/PITA_analysis/"
-filename  <- "powdat_5Hz_saved.mat"
+filename  <- "powdat_tACSEEG_beta_saved.mat"
 filepath  <- paste( path2file, filename, sep="" )
 
 dat <- readMat( filepath ) # for practice (empty dataframe):  dat <- array(data = NA, dim = c(39,2,600))
@@ -81,8 +81,8 @@ datlong$epoch  <- NA;  datlong$epochphase  <- NA
 for( iblock in 1:20){
   datlong$block[datlong$trial > (iblock-1)*29 & datlong$trial <= iblock*29 ] <- iblock
 }
-for( iblockphase in 1:3){  #iblockphase in 1:5){
-  datlong$blockphase[datlong$block > (iblockphase-1)*6 & datlong$block <= iblockphase*6 ] <- iblockphase
+for( iblockphase in 1:5){
+  datlong$blockphase[datlong$block > (iblockphase-1)*4 & datlong$block <= iblockphase*5 ] <- iblockphase
 }
 datlong$epoch      <- datlong$trial - ( (datlong$block-1) * 29 )
 for(iepochphase in 1:3){  #iepochphase in 1:5){
@@ -110,17 +110,17 @@ datlong$max <- quantile(datlong$power, 0.95, na.rm=TRUE) #(datlong$M + 2.5*(datl
 #datlong$max.ratio <- quantile(datlong$ratio, 0.95, na.rm=TRUE) #(datlong$M.ratio + 2.5*(datlong$SD.ratio))
 
 # # Mark outliers
-# datlong$outlier <- 0
-# datlong$outlier[(datlong$power < datlong$min)] <- 1
-# datlong$outlier[(datlong$power > datlong$max)] <- 1
-# #datlong$outlier[(datlong$ratio < datlong$min.ratio)] <- 1
-# #datlong$outlier[(datlong$ratio > datlong$max.ratio)] <- 1
-# table(datlong$outlier)
-# 
-# # Change outliers to NA
-# datlong$power.old <- datlong$power
-# datlong$power[datlong$outlier == 1] <- NA
-# #datlong$ratio[datlong$outlier == 1] <- NA
+datlong$outlier <- 0
+datlong$outlier[(datlong$power < datlong$min)] <- 1
+datlong$outlier[(datlong$power > datlong$max)] <- 1
+#datlong$outlier[(datlong$ratio < datlong$min.ratio)] <- 1
+#datlong$outlier[(datlong$ratio > datlong$max.ratio)] <- 1
+table(datlong$outlier)
+
+# Change outliers to NA
+datlong$power.old <- datlong$power
+datlong$power[datlong$outlier == 1] <- NA
+#datlong$ratio[datlong$outlier == 1] <- NA
 
 # Change power to NA in 3rd trial of each block, since the tACS artifact is still present in data
 datlong$power[datlong$epoch==3 & datlong$time==1] <- NA
@@ -138,7 +138,7 @@ head(datlong,3)
 
 # --------- Average dataframe ------
 # Make dataframe with average power per block
-datavg  <- ddply(datlong, c("subjectID","session","order","condition","block"),summarise, 
+datavg  <- ddply(datlong, c("subjectID","session","order","condition","block","blockphase"),summarise, 
                 meanpower=mean(power,na.rm=TRUE), SDpower=sd(power,na.rm=TRUE) ) #, meanratio=mean(ratio,na.rm=TRUE), SDratio=sd(ratio,na.rm=TRUE))
 head(datavg,3)
 
@@ -345,6 +345,37 @@ confint(lmm0, method="boot")
 # # Plot predicted values
 # datlong.old$predvals <- predict(lmm1)
 
+# --------- Plot Poster CNS --------
+meanpow.value <- mean(datavg$meanpower, na.rm=TRUE)
+sdpow.value   <- sd(datavg$meanpower, na.rm=TRUE)
+plotdata <- ddply(datavg, 
+                  c("condition","blockphase"), 
+                  summarise,
+                  N    = length(unique(datavg$subjectID)), #N    = sum(!is.na(meanpower)),
+                  mean = mean(meanpower, na.rm=TRUE),
+                  #  meanpred = mean(predvals, na.rm=TRUE),
+                  sd   = sd(meanpower, na.rm=TRUE),
+                  se   = sd / sqrt(N),
+                  zscore = (mean(meanpower, na.rm=TRUE) - meanpow.value) / (sdpow.value/sqrt(N)) )
+ggplot(plotdata, aes(x=blockphase, y=mean, group=condition, fill=condition)) +
+  geom_ribbon(aes(  ymin=mean-se, ymax=mean+se, fill=condition), alpha = .175) +
+  # geom_line(size = 0.5, color = "black", aes(x=blockphase, y=meanpred, group=condition, linetype=condition)) +
+  #geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.2, size = 0.3, position=position_dodge(0.01)) +
+  geom_line(linewidth=0.7, aes(color=condition)) + 
+  #ylim(c(0.48,0.57)) +
+  geom_point(size = 2, stroke = 1, aes(colour=condition, shape=condition)) +
+  ylab("log10 spectral power [4-7Hz]") + xlab("Blockphase") + ggtitle("tACS-EEG PITA (mean +/-SEM)") +
+  scale_colour_manual(values=c("#e09d5e","#28558f")) + scale_fill_manual(values=c("#e09d5e","#28558f")) 
+# + theme(panel.background = element_rect(fill="white",colour="white"), panel.border = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) 
+
+# Save plotdata:
+write.table(plotdata, file="/Users/fsmits2/Documents/BP_data-analyse/PITA_tACSEEG_plotdata_beta.csv", sep=";", row.names = FALSE)
+
+
+
+
+
+
 # --------- Plot --------
 plotdata <- ddply(datlong, 
                   c("condition","blockphase","order"), 
@@ -374,24 +405,46 @@ ggplot(plotdata, aes(x=blockphase, y=mean, group=condition, fill=condition)) +
 
 # ----------- Other plots raw data --------------
 plotdata <- ddply(datavg, 
-                  c("condition","block","order"), 
+                  c("condition","block"), 
                   summarise,
                   N    = sum(!is.na(meanpower)),
                   mean = mean(meanpower, na.rm=TRUE),
                   #  meanpred = mean(predvals, na.rm=TRUE),
                   sd   = sd(meanpower, na.rm=TRUE),
                   se   = sd / sqrt(N) )
-
 ggplot(plotdata, aes(x=block, y=mean, group=condition, fill=condition)) +
-  geom_ribbon(aes(  ymin=mean-sd, ymax=mean+sd, fill=condition), alpha = .175) +
+  geom_ribbon(aes(  ymin=mean-se, ymax=mean+se, fill=condition), alpha = .175) +
   # geom_line(size = 0.5, color = "black", aes(x=blockphase, y=meanpred, group=condition, linetype=condition)) +
-  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.2, size = 0.3, position=position_dodge(0.01)) +
+  #geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.2, size = 0.3, position=position_dodge(0.01)) +
   geom_line(linewidth=0.7, aes(color=condition)) + 
-  # ylim(c(0.3,0.65)) +
-  geom_point(size = 3, stroke = 1, aes(colour=condition, shape=condition)) +
+  ylim(c(0.46,0.58)) +
+  geom_point(size = 2, stroke = 1, aes(colour=condition, shape=condition)) +
   ylab("Spectral power [5Hz]") + xlab("Block") + 
-  scale_colour_manual(values=c("#999999","#28558f")) + scale_fill_manual(values=c("#999999","#28558f")) +
-  facet_wrap( . ~ order)
+  scale_colour_manual(values=c("#e09d5e","#28558f")) + scale_fill_manual(values=c("#e09d5e","#28558f")) +
+  theme(panel.background = element_rect(fill="white",colour="white"), panel.border = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) 
+
+
+plotdata <- ddply(datavg, 
+                  c("condition","blockphase"), 
+                  summarise,
+                  N    = sum(!is.na(meanpower)),
+                  mean = mean(meanpower, na.rm=TRUE),
+                  #  meanpred = mean(predvals, na.rm=TRUE),
+                  sd   = sd(meanpower, na.rm=TRUE),
+                  se   = sd / sqrt(N) )
+ggplot(plotdata, aes(x=blockphase, y=mean, group=condition, fill=condition)) +
+  geom_ribbon(aes(  ymin=mean-se, ymax=mean+se, fill=condition), alpha = .175) +
+  # geom_line(size = 0.5, color = "black", aes(x=blockphase, y=meanpred, group=condition, linetype=condition)) +
+  #geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.2, size = 0.3, position=position_dodge(0.01)) +
+  geom_line(linewidth=0.7, aes(color=condition)) + 
+  ylim(c(0.48,0.56)) +
+  geom_point(size = 2, stroke = 1, aes(colour=condition, shape=condition)) +
+  ylab("Spectral power [5Hz]") + xlab("Blockphase") + 
+  scale_colour_manual(values=c("#e09d5e","#28558f")) + scale_fill_manual(values=c("#e09d5e","#28558f")) +
+  theme(panel.background = element_rect(fill="white",colour="white"), panel.border = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) 
+
+
+
 
 plotdata2 <- ddply(datavg, 
                   c("condition","session"), 

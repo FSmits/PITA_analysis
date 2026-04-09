@@ -42,7 +42,7 @@ cd('/Users/fsmits2/Downloads/eeglab2022.1')
 % cd('/Users/fsmits2/Documents/PITA_analysis'); % return to PITA analysis folder
 
 % set paths to data
-Path2EEGsets = '/Users/fsmits2/Downloads/1 EEG data tacs-eeg/3 EEG sets processed/';
+Path2EEGsets = '/Users/fsmits2/Downloads/PITA/1 EEG data tacs-eeg/';
 
 % enter subject names
 subj_list =[669	557 363	638	989	383	502	733	442	575	710	262 ...
@@ -153,6 +153,54 @@ save(filename1,'datfr_rsc', '-v7.3');
 
 % % % filename='datfr_dense_saved.mat';
 % % % save(filename,'datfr_dense', '-v7.3');
+
+%% Output individual power spectrum for Python FOOOF algorithm
+
+
+% Which task (file type) you want to analyze?
+fileno = 1;
+
+subj_i = 23;
+sess_i = 1;
+
+fprintf('\n*** Load preprocessed data from: subject %i session %i\n', subj_list(subj_i), sessions(sess_i));
+fileName = [file_type{fileno} num2str(subj_list(subj_i)) '-' num2str(sess_i) '_CleanEEG.set'];
+
+% Load EEG set
+EEG      = pop_loadset('filename', fileName, 'filepath', Path2EEGsets);
+
+% Select channel Fz
+channame = {'Cz'}; 
+chan2use = find( strcmpi( channame, {EEG.chanlocs.labels} ));
+
+% Put EEG data in double precision for good computation performance
+EEG.datax = double( EEG.data);
+
+% Prepare Fourier Transform
+nfft      = EEG.srate * 4; % For zero-padding (upsampling) and overlapping in Welch's method
+nOverlap  = size(EEG.datax,2)/2; % For no overlap: 0;  for 50% overlap: size(EEG.datax,2)/2
+
+hannw     = hann(EEG.pnts); % Create Hann window to taper the data with.      = .5 * (1 - cos(2*pi*linspace( 0, 1, size(EEG.datax,2) ) ));
+
+% pre-specify power spectrum variable to save FFT results
+powspec   = nan( EEG.srate*2+1, size(EEG.datax,3) );
+
+% Do the FFT via Welch's method
+[powspec(:,:), hz] = pwelch( squeeze( EEG.datax(chan2use,:,:) ), hannw, nOverlap, nfft, EEG.srate );
+
+powspec_full = powspec;
+% Take the mean over all trials
+powspec = mean(powspec_full, 2, 'omitnan');
+
+
+% Write to file
+filepath = '/Users/fsmits2/Documents/FOOOF/';
+filename ='hz_freqs.mat';
+save([filepath filename],'hz', '-v6'); % to read in Python, save .mat files in V6 rather than V7 or higher as default (as suggested here: https://stackoverflow.com/questions/31188758/matlab-variables-save-as-python-format)
+filename ='powspec_PITA_rest_s1.mat';
+save([filepath filename],'powspec', '-v6'); % to read in Python, save .mat files in V6 rather than V7 or higher as default (as suggested here: https://stackoverflow.com/questions/31188758/matlab-variables-save-as-python-format)
+
+
 
 
 
@@ -319,7 +367,7 @@ powdat = nan(length(subj_list), length(sessions), 600); %for tACS_EEG data
 % % % % powdat = nan(length(subj_list), length(sessions), 120); %eyes-open
 
 % Select frequencies
-frqidx   = dsearchn(hz, [4.75  5.25]');
+frqidx   = dsearchn(hz, [1  3]');
 
 for subj_i = 1:length(subj_list)
     for sess_i = 1:length(sessions)
@@ -339,14 +387,14 @@ for subj_i = 1:length(subj_list)
         % Extract from data
         dataextract = [];
         % % % dataextract = datfr(subj_i,sess_i, chans2use_now, frqidx(1):frqidx(2), :);
-        dataextract = datfr_rso(subj_i,sess_i, chans2use_now, frqidx(1):frqidx(2), :);
+        dataextract = datfr(subj_i,sess_i, chans2use_now, frqidx(1):frqidx(2), :);
         % Average over channels and frequencies and log-transform
         powdat(subj_i,sess_i,:) = log10(squeeze( mean( mean(dataextract,4,'omitnan') ,3,'omitnan') ) );
        
     end
 end
 
-filename='powdat_rso_posttACS_5Hz_saved.mat';
+filename='powdat_tACSEEG_delta_saved.mat';
 save(filename,'powdat', '-v6');
 
 
@@ -354,6 +402,7 @@ save(filename,'powdat', '-v6');
 %% Plots for BRST2023 poster
 
 % LOAD datfr as matrix
+cd('/Users/fsmits2/Documents/PITA_analysis'); % return to PITA analysis folder
 load hz_saved.mat
 datfr = importdata('datfr_saved.mat');
 
@@ -409,6 +458,21 @@ s1_real = find( table2array(conds(:,2)) >  0 )';
 s1_sham = find( table2array(conds(:,2)) == 0 )';
 s2_real = find( table2array(conds(:,3)) >  0 )';
 s2_sham = find( table2array(conds(:,3)) == 0 )';
+
+
+% plot overall
+powtopo_sham  = mean( [ mean( log10( squeeze( mean( powdatfull(s1_sham, 1, :, :) ,4,'omitnan') ) ),1,'omitnan') ...
+                        mean( log10( squeeze( mean( powdatfull(s2_sham, 2, :, :) ,4,'omitnan') ) ),1,'omitnan') ], 1) ;
+powtopo_real  = mean( [ mean( log10( squeeze( mean( powdatfull(s1_real, 1, :, :) ,4,'omitnan') ) ),1,'omitnan') ...
+                             mean( log10( squeeze( mean( powdatfull(s2_real, 2, :, :) ,4,'omitnan') ) ),1,'omitnan') ], 1) ;
+
+figure(5); colormap jet
+clims_pow = [0.1 0.9];
+subplot(1,2,1); topoplot(powtopo_real, EEG.chanlocs(1:30)); %,'numcontour',0,'electrodes','numbers','shading','interp');
+title({'Real tACS, overall'}); c = colorbar; c.Label.String = '5Hz power (4.75-5.25 Hz) \muV^2 (log10)'; set(gca,'clim',clims_pow);
+subplot(1,2,2); topoplot(powtopo_sham, EEG.chanlocs(1:30)); %,'numcontour',0,'electrodes','numbers','shading','interp');
+title({'Sham tACS, overall'}); c = colorbar; c.Label.String = '5Hz power (4.75-5.25 Hz) \muV^2 (log10)'; set(gca,'clim',clims_pow);
+
 
 % Define where to cut trials to divide data into 5 segments (of 4x 30-sec EEG recording each)
 cuts = 1:116:580;
